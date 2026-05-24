@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,20 @@ const anomalyLogSchema = new mongoose.Schema({
 });
 
 const AnomalyLog = mongoose.models.AnomalyLog || mongoose.model('AnomalyLog', anomalyLogSchema);
+
+// Define Schema for Secure Master Password Locks
+const securityLockSchema = new mongoose.Schema({
+  passwordHash: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const SecurityLock = mongoose.models.SecurityLock || mongoose.model('SecurityLock', securityLockSchema);
+
+let localMemoryPasswordHash = null; // Server in-memory fallback for master password
+
+function hashPasswordOnServer(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 // In-Memory Database fallback array
 let localMemoryLogs = [
@@ -266,8 +281,78 @@ setInterval(() => {
 }, 3000);
 
 // --------------------------------------------------------------------------
-// 3. REST API ENDPOINTS
+// 3. REST API ENDPOINTS - SECURE AUTHENTICATION SYSTEM
 // --------------------------------------------------------------------------
+
+app.get('/api/auth/status', async (req, res) => {
+  try {
+    let isSet = false;
+    if (isDatabaseConnected) {
+      const lock = await SecurityLock.findOne();
+      isSet = !!lock;
+    } else {
+      isSet = !!localMemoryPasswordHash;
+    }
+    res.json({ isSet });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/setup', async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+    }
+    
+    const hash = hashPasswordOnServer(password);
+    
+    if (isDatabaseConnected) {
+      await SecurityLock.deleteMany({});
+      await SecurityLock.create({ passwordHash: hash });
+    } else {
+      localMemoryPasswordHash = hash;
+    }
+    
+    res.json({ success: true, message: 'Master password configured successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required.' });
+    }
+    
+    const inputHash = hashPasswordOnServer(password);
+    let storedHash = null;
+    
+    if (isDatabaseConnected) {
+      const lock = await SecurityLock.findOne();
+      if (lock) {
+        storedHash = lock.passwordHash;
+      }
+    } else {
+      storedHash = localMemoryPasswordHash;
+    }
+    
+    if (!storedHash) {
+      return res.status(400).json({ error: 'No master password set. Please configure setup first.' });
+    }
+    
+    if (inputHash === storedHash) {
+      res.json({ success: true, authorized: true });
+    } else {
+      res.status(401).json({ error: 'Invalid master access code.' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/status', (req, res) => {
   const latestMSE = STATE.sensorHistory.mse[STATE.sensorHistory.mse.length - 1];
