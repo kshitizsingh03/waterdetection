@@ -680,10 +680,51 @@ function isNightHours(date) {
 }
 
 // --------------------------------------------------------------------------
-// 9. EVENT BINDING & APP INITIALIZATION
+// 9. SECURITY & SESSION CONTROL
 // --------------------------------------------------------------------------
 
-async function bootstrapApp() {
+function hashPassword(password) {
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
+}
+
+function checkSecurityLock() {
+  const stored = localStorage.getItem('masterPassword');
+  const screenSetup = document.getElementById('screen-setup');
+  const screenLogin = document.getElementById('screen-login');
+  const lockModal = document.getElementById('lock-screen-modal');
+
+  if (!stored) {
+    screenSetup.classList.remove('hidden');
+    screenLogin.classList.add('hidden');
+    lockModal.classList.remove('slide-up');
+    lockModal.classList.remove('hidden');
+  } else {
+    screenSetup.classList.add('hidden');
+    screenLogin.classList.remove('hidden');
+    lockModal.classList.remove('slide-up');
+    lockModal.classList.remove('hidden');
+  }
+}
+
+function unlockDashboard() {
+  const lockModal = document.getElementById('lock-screen-modal');
+  lockModal.classList.add('slide-up');
+  
+  // Start active dashboard updates
+  startDashboardSession();
+}
+
+let isSessionStarted = false;
+async function startDashboardSession() {
+  if (isSessionStarted) return;
+  isSessionStarted = true;
+
   // 1. Initial sync with server
   await fetchServerStatus();
   await fetchTelemetryData();
@@ -694,9 +735,41 @@ async function bootstrapApp() {
   updateDashboardUI();
 
   // 3. Setup periodic sync interval (every 3 seconds)
-  STATE.syncIntervalId = setInterval(handlePeriodicSync, 3000);
+  if (!STATE.syncIntervalId) {
+    STATE.syncIntervalId = setInterval(handlePeriodicSync, 3000);
+  }
+}
+
+function lockDashboard() {
+  const lockModal = document.getElementById('lock-screen-modal');
+  lockModal.classList.remove('slide-up');
   
-  // Local second clock
+  // Reset password field values
+  document.getElementById('login-pw').value = '';
+  if (document.getElementById('setup-pw')) document.getElementById('setup-pw').value = '';
+  if (document.getElementById('setup-pw-confirm')) document.getElementById('setup-pw-confirm').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+  document.getElementById('setup-error').classList.add('hidden');
+  
+  // Clear periodic sync
+  if (STATE.syncIntervalId) {
+    clearInterval(STATE.syncIntervalId);
+    STATE.syncIntervalId = null;
+  }
+  isSessionStarted = false;
+  
+  checkSecurityLock();
+}
+
+// --------------------------------------------------------------------------
+// 10. EVENT BINDING & APP INITIALIZATION
+// --------------------------------------------------------------------------
+
+async function bootstrapApp() {
+  // Check localStorage password and display overlay modal
+  checkSecurityLock();
+
+  // Local clock widget (runs immediately and is public)
   setInterval(() => {
     const clockElement = document.getElementById('live-clock');
     if (clockElement) {
@@ -709,7 +782,238 @@ async function bootstrapApp() {
     }
   }, 1000);
 
-  // 4. Bind DOM User Events
+  // 1. Security Lock Screen Form Bindings
+  const formSetup = document.getElementById('form-setup');
+  if (formSetup) {
+    formSetup.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pwVal = document.getElementById('setup-pw').value;
+      const pwConfirmVal = document.getElementById('setup-pw-confirm').value;
+      const errorMsg = document.getElementById('setup-error');
+      
+      if (pwVal !== pwConfirmVal) {
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+      errorMsg.classList.add('hidden');
+      
+      // Store hashed password locally
+      localStorage.setItem('masterPassword', hashPassword(pwVal));
+      
+      // Unlock portal immediately
+      unlockDashboard();
+    });
+  }
+
+  const formLogin = document.getElementById('form-login');
+  if (formLogin) {
+    formLogin.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inputPw = document.getElementById('login-pw').value;
+      const errorMsg = document.getElementById('login-error');
+      const hashedStored = localStorage.getItem('masterPassword');
+      
+      if (hashPassword(inputPw) === hashedStored) {
+        errorMsg.classList.add('hidden');
+        unlockDashboard();
+      } else {
+        errorMsg.classList.remove('hidden');
+      }
+    });
+  }
+
+  // Toggle Password Field visibility icon
+  const togglePwBtn = document.getElementById('btn-toggle-pw');
+  if (togglePwBtn) {
+    togglePwBtn.addEventListener('click', () => {
+      const pwInput = document.getElementById('login-pw');
+      const eyeClosed = togglePwBtn.querySelector('.eye-closed-icon');
+      const eyeOpen = togglePwBtn.querySelector('.eye-open-icon');
+      
+      if (pwInput.type === 'password') {
+        pwInput.type = 'text';
+        eyeClosed.classList.add('hidden');
+        eyeOpen.classList.remove('hidden');
+      } else {
+        pwInput.type = 'password';
+        eyeOpen.classList.add('hidden');
+        eyeClosed.classList.remove('hidden');
+      }
+    });
+  }
+
+  // Lock Icon button in header (Re-lock or Reset Password)
+  const lockBtn = document.getElementById('lock-btn');
+  if (lockBtn) {
+    lockBtn.addEventListener('click', () => {
+      const option = confirm("Do you want to reset your master security password?\n\n- Click OK to RESET password and lock the portal.\n- Click Cancel to just LOCK the portal screen.");
+      if (option) {
+        localStorage.removeItem('masterPassword');
+      }
+      lockDashboard();
+    });
+  }
+
+  // 2. Custom SCADA Telemetry Scanner Slider & Quick Presets
+  const hourSlider = document.getElementById('scan-hour');
+  const hourLabel = document.getElementById('scan-hour-lbl');
+  if (hourSlider && hourLabel) {
+    hourSlider.addEventListener('input', (e) => {
+      const hr = parseInt(e.target.value);
+      let displayTime = '';
+      if (hr === 0) displayTime = '12:00 AM';
+      else if (hr < 12) displayTime = `${hr}:00 AM`;
+      else if (hr === 12) displayTime = '12:00 PM';
+      else displayTime = `${hr - 12}:00 PM`;
+      
+      hourLabel.textContent = displayTime;
+    });
+  }
+
+  const btnNormal = document.getElementById('btn-quick-normal');
+  if (btnNormal) {
+    btnNormal.addEventListener('click', () => {
+      document.getElementById('scan-pressure').value = 5.80;
+      document.getElementById('scan-flow').value = 34.5;
+      document.getElementById('scan-tank').value = 4.10;
+      document.getElementById('scan-demand').value = 22.5;
+    });
+  }
+
+  const btnLeak = document.getElementById('btn-quick-leak');
+  if (btnLeak) {
+    btnLeak.addEventListener('click', () => {
+      document.getElementById('scan-pressure').value = 3.20;
+      document.getElementById('scan-flow').value = 52.0;
+      document.getElementById('scan-tank').value = 4.10;
+      document.getElementById('scan-demand').value = 22.5;
+    });
+  }
+
+  // 3. Custom SCADA Scanner Form Submission Handler
+  const scannerForm = document.getElementById('pipeline-scanner-form');
+  if (scannerForm) {
+    scannerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const idleState = document.getElementById('report-state-idle');
+      const loadingState = document.getElementById('report-state-loading');
+      const resultsState = document.getElementById('report-state-results');
+      
+      if (idleState) idleState.classList.add('hidden');
+      if (resultsState) resultsState.classList.add('hidden');
+      if (loadingState) loadingState.classList.remove('hidden');
+      
+      const sensorId = document.getElementById('scan-sensor-id').value;
+      const hour = parseInt(document.getElementById('scan-hour').value);
+      const pressure = parseFloat(document.getElementById('scan-pressure').value);
+      const flow = parseFloat(document.getElementById('scan-flow').value);
+      const tank = parseFloat(document.getElementById('scan-tank').value);
+      const demand = parseFloat(document.getElementById('scan-demand').value);
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sensorId,
+            hour,
+            minute: 0,
+            pressure,
+            flow,
+            tank,
+            demand
+          })
+        });
+        
+        const data = await response.json();
+        
+        // Wait 800ms to simulate the GRU Deep Learning Seq-to-Seq Math pass
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (data.success) {
+          loadingState.classList.add('hidden');
+          resultsState.classList.remove('hidden');
+          
+          const outcomeEl = document.getElementById('scan-res-outcome');
+          const badgeEl = document.getElementById('scan-res-badge');
+          
+          if (data.hasBreached) {
+            outcomeEl.textContent = 'WATER IS LEAKING';
+            outcomeEl.style.color = 'var(--danger-color)';
+            badgeEl.textContent = data.risk.toUpperCase() + ' RISK';
+            badgeEl.className = 'report-badge badge-danger';
+            
+            // Add red flash alarm glow
+            const container = document.getElementById('scan-report-container');
+            container.classList.add('border-leak-pulse');
+            setTimeout(() => container.classList.remove('border-leak-pulse'), 3000);
+          } else {
+            outcomeEl.textContent = 'NETWORK HEALTHY';
+            outcomeEl.style.color = 'var(--success-color)';
+            badgeEl.textContent = 'HEALTHY';
+            badgeEl.className = 'report-badge badge-success';
+          }
+          
+          document.getElementById('scan-res-timestamp').textContent = data.timestamp;
+          document.getElementById('scan-res-mse').textContent = Number(data.mse).toFixed(4);
+          document.getElementById('scan-res-threshold').textContent = Number(data.threshold).toFixed(3);
+          
+          const hourStr = hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour-12} PM`;
+          document.getElementById('scan-res-mode').textContent = `${hourStr} (Adaptive)`;
+          
+          const deltaVal = ((data.mse - data.threshold) / data.threshold) * 100;
+          const deltaEl = document.getElementById('scan-res-delta');
+          if (deltaVal > 0) {
+            deltaEl.textContent = `+${deltaVal.toFixed(1)}%`;
+            deltaEl.className = 'detail-val text-danger';
+          } else {
+            deltaEl.textContent = `${deltaVal.toFixed(1)}%`;
+            deltaEl.className = 'detail-val text-success';
+          }
+          
+          // Animate Ring stroke-dashoffset
+          const miniGaugeFill = document.getElementById('mini-gauge-fill');
+          const percent = Math.min(1.0, data.mse / 0.1);
+          const dashOffset = 251.2 - percent * 251.2;
+          miniGaugeFill.style.strokeDashoffset = dashOffset;
+          miniGaugeFill.style.stroke = data.hasBreached ? 'var(--danger-color)' : 'var(--success-color)';
+          
+          // Set deviations
+          const presDev = document.getElementById('scan-dev-pressure');
+          presDev.textContent = `${data.deviations.pressure}%`;
+          presDev.className = data.deviations.pressure > 15 ? 'dev-val text-danger' : 'dev-val text-success';
+          
+          const flowDev = document.getElementById('scan-dev-flow');
+          flowDev.textContent = `${data.deviations.flow}%`;
+          flowDev.className = data.deviations.flow > 15 ? 'dev-val text-danger' : 'dev-val text-success';
+          
+          const tankDev = document.getElementById('scan-dev-tank');
+          tankDev.textContent = `${data.deviations.tank}%`;
+          tankDev.className = data.deviations.tank > 10 ? 'dev-val text-danger' : 'dev-val text-success';
+          
+          const demaDev = document.getElementById('scan-dev-demand');
+          demaDev.textContent = `${data.deviations.demand}%`;
+          demaDev.className = data.deviations.demand > 10 ? 'dev-val text-danger' : 'dev-val text-success';
+          
+          // Prepend to current session logs
+          STATE.tableLogs.unshift(data);
+          if (STATE.tableLogs.length > 100) STATE.tableLogs.pop();
+          
+          // Refresh table
+          STATE.tablePage = 1;
+          renderTableLogs();
+        }
+      } catch (err) {
+        console.error('Scan failed:', err);
+        loadingState.classList.add('hidden');
+        if (idleState) idleState.classList.remove('hidden');
+        alert('Evaluation node scanning failed: ' + err.message);
+      }
+    });
+  }
+
+  // 4. Other Standard UI Event Bindings
   document.getElementById('btn-scenario-healthy').addEventListener('click', () => setServerScenario('healthy'));
   document.getElementById('btn-scenario-leak').addEventListener('click', () => setServerScenario('leak'));
   document.getElementById('btn-scenario-theft').addEventListener('click', () => setServerScenario('theft'));
@@ -717,7 +1021,6 @@ async function bootstrapApp() {
   document.getElementById('theme-toggle-btn').addEventListener('click', handleThemeToggle);
   document.getElementById('export-csv-btn').addEventListener('click', downloadLogsCSV);
 
-  // Filters
   document.getElementById('search-input').addEventListener('input', () => {
     STATE.tablePage = 1;
     fetchLogsHistory();
@@ -727,7 +1030,6 @@ async function bootstrapApp() {
     fetchLogsHistory();
   });
 
-  // Table pagination
   document.getElementById('btn-prev').addEventListener('click', () => {
     if (STATE.tablePage > 1) {
       STATE.tablePage--;
@@ -739,7 +1041,6 @@ async function bootstrapApp() {
     renderTableLogs();
   });
 
-  // Time range button adjusting
   document.querySelectorAll('.range-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));

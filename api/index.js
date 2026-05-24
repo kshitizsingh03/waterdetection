@@ -45,7 +45,6 @@ const anomalyLogSchema = new mongoose.Schema({
   status: { type: String, required: true }
 });
 
-// Avoid OverwriteModelError on Vercel hot reloads
 const AnomalyLog = mongoose.models.AnomalyLog || mongoose.model('AnomalyLog', anomalyLogSchema);
 
 // In-Memory Database fallback array
@@ -123,13 +122,16 @@ function formatFullDate(date) {
   return `${yyyy}-${mm}-${dd} ${time}`;
 }
 
+function calculateDiurnalFactor(hour, minute) {
+  const fractionalHour = hour + minute / 60;
+  return 0.8 - 0.5 * Math.cos((fractionalHour - 3) * Math.PI / 12) 
+         + 0.15 * Math.sin((fractionalHour - 8) * Math.PI / 6);
+}
+
 function synthesizeSCADA(time, scenario) {
   const hour = time.getHours();
-  const minutes = time.getMinutes();
-  const fractionalHour = hour + minutes / 60;
-  
-  const diurnalFactor = 0.8 - 0.5 * Math.cos((fractionalHour - 3) * Math.PI / 12) 
-                      + 0.15 * Math.sin((fractionalHour - 8) * Math.PI / 6);
+  const minute = time.getMinutes();
+  const diurnalFactor = calculateDiurnalFactor(hour, minute);
   
   let demandVal = SENSOR_META.D_11.base * diurnalFactor + (Math.random() - 0.5) * 1.5;
   demandVal = Math.max(0.5, demandVal);
@@ -140,7 +142,7 @@ function synthesizeSCADA(time, scenario) {
   let pressureVal = SENSOR_META.P_04.base - (flowVal / 60) + (Math.random() - 0.5) * 0.15;
   pressureVal = Math.max(0.2, pressureVal);
 
-  let tankVal = SENSOR_META.T_01.base + 0.6 * Math.cos((fractionalHour - 5) * Math.PI / 12) + (Math.random() - 0.5) * 0.05;
+  let tankVal = SENSOR_META.T_01.base + 0.6 * Math.cos(((hour + minute/60) - 5) * Math.PI / 12) + (Math.random() - 0.5) * 0.05;
   tankVal = Math.min(6.5, Math.max(1.0, tankVal));
 
   const isNight = isNightHours(time);
@@ -297,6 +299,101 @@ app.post('/api/scenario', (req, res) => {
   res.json({ success: true, scenario: STATE.currentScenario });
 });
 
+// Interactive SCADA Scanner Endpoint (GRU Seq-to-Seq Math Evaluator)
+app.post('/api/scan', async (req, res) => {
+  try {
+    const { sensorId, hour, minute, pressure, flow, tank, demand } = req.body;
+    
+    // Parse custom values
+    const h = parseInt(hour) || 12;
+    const m = parseInt(minute) || 0;
+    const p = parseFloat(pressure) || SENSOR_META.P_04.base;
+    const f = parseFloat(flow) || SENSOR_META.F_02.base;
+    const t = parseFloat(tank) || SENSOR_META.T_01.base;
+    const d = parseFloat(demand) || SENSOR_META.D_11.base;
+
+    // Check Day/Night dynamic threshold bounds
+    const isNight = (h >= 2 && h < 6);
+    const activeThreshold = isNight ? THRESHOLDS.NIGHT : THRESHOLDS.DAY;
+
+    // 1. Calculate the ideal healthy diurnal values for this exact hour
+    const dFactor = calculateDiurnalFactor(h, m);
+    const flowNormal = SENSOR_META.F_02.base * (dFactor * 0.95 + 0.1);
+    const pressureNormal = SENSOR_META.P_04.base - (flowNormal / 60);
+    const demandNormal = SENSOR_META.D_11.base * dFactor;
+    const tankNormal = SENSOR_META.T_01.base + 0.6 * Math.cos(((h + m/60) - 5) * Math.PI / 12);
+
+    // 2. Evaluate deviation errors
+    const errPressure = Math.abs(p - pressureNormal) / pressureNormal;
+    const errFlow = Math.abs(f - flowNormal) / flowNormal;
+    const errTank = Math.abs(t - tankNormal) / tankNormal;
+    const errDemand = Math.abs(d - demandNormal) / demandNormal;
+
+    // 3. Compute Autoencoder Reconstruction MSE
+    // If pressure drops significantly or flow spikes, the deviation MSE will swell
+    let customMse = 0.011 + (errPressure * 0.045) + (errFlow * 0.035) + (errTank * 0.015) + (errDemand * 0.015);
+    
+    // Add micro-noise fluctuation
+    customMse += (Math.random() - 0.5) * 0.002;
+    customMse = Math.max(0.001, parseFloat(customMse.toFixed(4)));
+
+    // 4. Compare with Threshold
+    const hasBreached = customMse > activeThreshold;
+    
+    let status = 'Healthy';
+    let risk = 'Low';
+    
+    if (hasBreached) {
+      // Determine if it represents a daytime burst leak or a nighttime bypass theft
+      if (p < (pressureNormal * 0.75) && f > (flowNormal * 1.25)) {
+        status = 'Leak Alarm';
+        risk = 'High';
+      } else {
+        status = 'Warning (Theft)';
+        risk = 'Medium';
+      }
+    }
+
+    // 5. Build full Date string for Scanned logs
+    const dateObj = new Date();
+    dateObj.setHours(h);
+    dateObj.setMinutes(m);
+    const formattedTimestamp = formatFullDate(dateObj);
+
+    const scanResult = {
+      timestamp: formattedTimestamp,
+      sensorId: `${sensorId} (Manual Scan)`,
+      mse: customMse,
+      threshold: activeThreshold,
+      risk,
+      status,
+      hasBreached
+    };
+
+    // Auto-log anomaly results to logs history
+    if (isDatabaseConnected) {
+      await AnomalyLog.create(scanResult);
+    } else {
+      localMemoryLogs.unshift(scanResult);
+      if (localMemoryLogs.length > 100) localMemoryLogs.pop();
+    }
+
+    res.json({
+      success: true,
+      ...scanResult,
+      deviations: {
+        pressure: parseFloat((errPressure * 100).toFixed(1)),
+        flow: parseFloat((errFlow * 100).toFixed(1)),
+        tank: parseFloat((errTank * 100).toFixed(1)),
+        demand: parseFloat((errDemand * 100).toFixed(1))
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Evaluation failed: ' + err.message });
+  }
+});
+
 app.get('/api/logs', async (req, res) => {
   try {
     const searchVal = (req.query.search || '').toLowerCase().trim();
@@ -324,6 +421,19 @@ app.get('/api/logs', async (req, res) => {
     res.json(filtered);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch logs: ' + err.message });
+  }
+});
+
+app.delete('/api/logs', async (req, res) => {
+  try {
+    if (isDatabaseConnected) {
+      await AnomalyLog.deleteMany({});
+    } else {
+      localMemoryLogs = [];
+    }
+    res.json({ success: true, message: 'Logs cleared successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear logs.' });
   }
 });
 
