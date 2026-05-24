@@ -1,124 +1,108 @@
 import os
-import sys
-import json
-import random
-import math
+import torch
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from gru_ae_model import GRUAutoencoder
+
 
 class WaterLeakageDetector:
     """
-    Real-time water leakage detection using a pre-trained GRU Autoencoder model.
+    Backend class for real-time water leakage detection using a pre-trained GRU Autoencoder model.
     """
+
     def __init__(self, checkpoint_dir='Checkpoints'):
-        self.day_threshold = 0.045
-        self.night_threshold = 0.020
-        self.model_loaded = False
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        try:
-            import torch
-            import torch.nn as nn
-            
-            class GRUAutoencoder(nn.Module):
-                def __init__(self, input_dim):
-                    super(GRUAutoencoder, self).__init__()
-                    self.seq_1 = nn.GRU(input_dim, 80, batch_first=True)
-                    self.dropout_1 = nn.Dropout(0.2)
-                    self.seq_2 = nn.GRU(80, 80, batch_first=True)
-                    self.dropout_2 = nn.Dropout(0.2)
-                    self.fc = nn.Linear(80, input_dim)
+        # 1. Dynamic error thresholds
+        self.day_threshold = 95
+        self.night_threshold = 75
+        
+        # 2. Load the trained GRU Autoencoder
+        model_path = os.path.join(checkpoint_dir, 'gru_ae_best.pth')
+        if not os.path.exists(model_path):
+             raise FileNotFoundError(f"Model checkpoint not found at {model_path}. Run gru_ae_model.py first.")
+             
+        self.model = GRUAutoencoder(input_dim=40).to(self.device)
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        self.model.eval()
 
-                def forward(self, x):
-                    x = x.contiguous()
-                    x, _ = self.seq_1(x)
-                    x = self.dropout_1(x)
-                    x, _ = self.seq_2(x)
-                    x = self.dropout_2(x)
-                    x = self.fc(x)
-                    return x
-
-            model_path = os.path.join(checkpoint_dir, 'gru_ae_best.pth')
-            if os.path.exists(model_path):
-                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                self.model = GRUAutoencoder(input_dim=40).to(self.device)
-                self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-                self.model.eval()
-                self.model_loaded = True
-        except Exception as e:
-            # Fallback to emulation when torch is not installed
-            pass
-
-    def calculate_diurnal_factor(self, hour, minute=0):
-        fractional_hour = hour + minute / 60
-        return 0.8 - 0.5 * math.cos((fractional_hour - 3) * math.pi / 12) + 0.15 * math.sin((fractional_hour - 8) * math.pi / 6)
-
-    def predict_math(self, hour, pressure, flow, tank, demand):
-        is_night = (hour >= 2 and hour < 6)
-        active_threshold = self.night_threshold if is_night else self.day_threshold
+    def predict(self, feature_vector):
+        """
+        Predicts anomaly (leak) status for a single real-time snapshot / timestep.
         
-        # 1. Calculate the ideal healthy diurnal values for this exact hour
-        d_factor = self.calculate_diurnal_factor(hour)
-        flow_normal = 34.5 * (d_factor * 0.95 + 0.1)
-        pressure_normal = 5.8 - (flow_normal / 60)
-        demand_normal = 22.5 * d_factor
-        tank_normal = 4.1 + 0.6 * math.cos((hour - 5) * math.pi / 12)
-        
-        # 2. Evaluate deviation errors
-        err_pressure = abs(pressure - pressure_normal) / pressure_normal
-        err_flow = abs(flow - flow_normal) / flow_normal
-        err_tank = abs(tank - tank_normal) / tank_normal
-        err_demand = abs(demand - demand_normal) / demand_normal
-        
-        # 3. Compute Autoencoder Reconstruction MSE
-        custom_mse = 0.011 + (err_pressure * 0.045) + (err_flow * 0.035) + (err_tank * 0.015) + (err_demand * 0.015)
-        custom_mse += (random.random() - 0.5) * 0.002
-        custom_mse = max(0.001, round(custom_mse, 4))
-        
-        # 4. Compare with Threshold
-        has_breached = custom_mse > active_threshold
-        status = 'Healthy'
-        risk = 'Low'
-        
-        if has_breached:
-            if pressure < (pressure_normal * 0.75) and flow > (flow_normal * 1.25):
-                status = 'Leak Alarm'
-                risk = 'High'
-            else:
-                status = 'Warning (Theft)'
-                risk = 'Medium'
+        Args:
+            feature_vector (list or numpy array): An array of exactly 40 numbers.
+                Requires the last element (index 39) to be the `Is_Nighttime` flag (1 or 0).
                 
-        return {
-            "success": True,
-            "mse": custom_mse,
-            "threshold": active_threshold,
-            "risk": risk,
-            "status": status,
-            "hasBreached": has_breached,
-            "deviations": {
-                "pressure": round(err_pressure * 100, 1),
-                "flow": round(err_flow * 100, 1),
-                "tank": round(err_tank * 100, 1),
-                "demand": round(err_demand * 100, 1)
-            },
-            "inferenceNode": "Python Bridge (GRU PyTorch Active)"
-        }
-
-    def predict(self, input_data):
-        # Gracefully handle evaluation logic
-        return self.predict_math(
-            input_data.get('hour', 12),
-            input_data.get('pressure', 5.80),
-            input_data.get('flow', 34.5),
-            input_data.get('tank', 4.10),
-            input_data.get('demand', 22.5)
-        )
-
-if __name__ == '__main__':
-    try:
-        # Read JSON from argument or stdin
-        input_str = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
-        input_json = json.loads(input_str)
+        Returns:
+            is_leak (bool): True if the system detects an anomaly.
+            reconstruction_error (float): The actual MSE value of the network.
+            threshold_used (float): The specific threshold margin applied (Day vs Night).
+        """
         
-        detector = WaterLeakageDetector()
-        result = detector.predict(input_json)
+        features = np.array(feature_vector, dtype=np.float32)
+        is_nighttime = int(features[-1]) # Extract Nighttime flag (assumed to be the last feature)
+        features = StandardScaler().fit_transform(features.reshape(1, -1))  # Scale features
+        
+        if features.shape[-1] != 40:
+            raise ValueError(f"Model expects exactly 40 features. Received {features.shape[-1]}.")
+            
+        # Reshape data to (Batch=1, Sequence=1, Features=40) for GRU compatibility
+        x_tensor = torch.tensor(features).unsqueeze(0).to(self.device)
+        
+        with torch.no_grad():
+            reconstructed = self.model(x_tensor)
+            
+        # Calculate reconstruction mean squared error
+        error = np.mean(np.square(x_tensor.cpu().numpy() - reconstructed.cpu().numpy()))
+        
+        # Determine strictness context
+        threshold = self.night_threshold if is_nighttime else self.day_threshold
+        
+        # Flag leak if reconstruction error crosses bounds
+        is_leak = bool(error > threshold)
+        
+        return is_leak, error, threshold
+
+import sys
+import json
+
+if __name__ == "__main__":
+    try:
+        # Suppress PyTorch warnings/prints if any
+        import warnings
+        warnings.filterwarnings("ignore")
+        
+        # Read JSON from stdin
+        input_str = sys.stdin.read().strip()
+        if not input_str:
+            print(json.dumps({"success": False, "error": "No input provided"}))
+            sys.exit(1)
+            
+        data = json.loads(input_str)
+        features = data.get("features")
+        
+        if not features or len(features) != 40:
+            print(json.dumps({"success": False, "error": f"Requires array of 40 features, got {len(features) if features else 0}"}))
+            sys.exit(1)
+            
+        # Get absolute path to Checkpoints based on this script's location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ckpt_dir = os.path.join(script_dir, 'Checkpoints')
+        
+        detector = WaterLeakageDetector(ckpt_dir)
+        is_leak, mse, thresh = detector.predict(features)
+        
+        # Output strictly JSON
+        result = {
+            "success": True,
+            "status": "Leak Detected" if is_leak else "Normal",
+            "mse": float(mse),
+            "threshold": float(thresh),
+            "is_leak": is_leak
+        }
         print(json.dumps(result))
+        
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e)}))
+
