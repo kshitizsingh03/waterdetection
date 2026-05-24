@@ -25,19 +25,14 @@ let isDatabaseConnected = false;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (MONGODB_URI) {
-  console.log('Attempting to connect to MongoDB Atlas Cloud...');
   mongoose
     .connect(MONGODB_URI)
     .then(() => {
-      console.log('=> MongoDB Atlas Cloud Connected Successfully!');
       isDatabaseConnected = true;
     })
     .catch((err) => {
       console.error('=> MongoDB Connection Error:', err.message);
-      console.log('Running in Database Graceful Fallback Mode.');
     });
-} else {
-  console.log('No MONGODB_URI found. Running in Database Graceful Fallback Mode (In-memory logs).');
 }
 
 // Define Schema for Leak Logs
@@ -50,33 +45,28 @@ const anomalyLogSchema = new mongoose.Schema({
   status: { type: String, required: true }
 });
 
-const AnomalyLog = mongoose.model('AnomalyLog', anomalyLogSchema);
+// Avoid OverwriteModelError on Vercel hot reloads
+const AnomalyLog = mongoose.models.AnomalyLog || mongoose.model('AnomalyLog', anomalyLogSchema);
 
 // In-Memory Database fallback array
-let localMemoryLogs = [];
-
-// Seed memory logs with initial baseline data
-function seedInitialLogs() {
-  localMemoryLogs = [
-    {
-      timestamp: '2026-05-25 01:22:15 AM',
-      sensorId: 'P-04 / F-02',
-      mse: 0.0825,
-      threshold: 0.045,
-      risk: 'High',
-      status: 'Leak Alarm'
-    },
-    {
-      timestamp: '2026-05-25 03:45:00 AM',
-      sensorId: 'D-11 / F-02',
-      mse: 0.0278,
-      threshold: 0.020,
-      risk: 'Medium',
-      status: 'Warning (Theft)'
-    }
-  ];
-}
-seedInitialLogs();
+let localMemoryLogs = [
+  {
+    timestamp: '2026-05-25 01:22:15 AM',
+    sensorId: 'P-04 / F-02',
+    mse: 0.0825,
+    threshold: 0.045,
+    risk: 'High',
+    status: 'Leak Alarm'
+  },
+  {
+    timestamp: '2026-05-25 03:45:00 AM',
+    sensorId: 'D-11 / F-02',
+    mse: 0.0278,
+    threshold: 0.020,
+    risk: 'Medium',
+    status: 'Warning (Theft)'
+  }
+];
 
 // --------------------------------------------------------------------------
 // 2. AUTOENCODER MATHEMATICAL INFERENCE & TELEMETRY SYNTHESIS
@@ -133,9 +123,6 @@ function formatFullDate(date) {
   return `${yyyy}-${mm}-${dd} ${time}`;
 }
 
-/**
- * Replicates the GRU Seq-to-Seq Autoencoder mathematical evaluation
- */
 function synthesizeSCADA(time, scenario) {
   const hour = time.getHours();
   const minutes = time.getMinutes();
@@ -186,9 +173,6 @@ function synthesizeSCADA(time, scenario) {
   };
 }
 
-/**
- * Populates historical data queue matching scenario
- */
 function fillHistory() {
   const steps = 60;
   const timeStepMs = 1 * 60 * 1000;
@@ -222,7 +206,7 @@ function fillHistory() {
 }
 fillHistory();
 
-// Real-time server loop ticking every 3 seconds
+// Periodic tick updates
 setInterval(() => {
   STATE.currentTime = new Date(STATE.currentTime.getTime() + 1 * 60 * 1000);
   const scada = synthesizeSCADA(STATE.currentTime, STATE.currentScenario);
@@ -245,7 +229,6 @@ setInterval(() => {
     STATE.sensorHistory.timestamps.shift();
   }
 
-  // Auto-log anomaly events to database
   if (scada.mse > scada.threshold) {
     const timestampStr = formatFullDate(STATE.currentTime);
     let sensorId = 'P-04';
@@ -275,7 +258,7 @@ setInterval(() => {
       AnomalyLog.create(logEntry).catch(err => console.error('Failed to log anomaly to MongoDB:', err));
     } else {
       localMemoryLogs.unshift(logEntry);
-      if (localMemoryLogs.length > 100) localMemoryLogs.pop(); // Cap local history
+      if (localMemoryLogs.length > 100) localMemoryLogs.pop();
     }
   }
 }, 3000);
@@ -284,7 +267,6 @@ setInterval(() => {
 // 3. REST API ENDPOINTS
 // --------------------------------------------------------------------------
 
-// Fetch general server configuration & statuses
 app.get('/api/status', (req, res) => {
   const latestMSE = STATE.sensorHistory.mse[STATE.sensorHistory.mse.length - 1];
   const latestThreshold = STATE.sensorHistory.threshold[STATE.sensorHistory.threshold.length - 1];
@@ -300,12 +282,10 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Fetch full telemetry logs and scrolling dataset history
 app.get('/api/telemetry', (req, res) => {
   res.json(STATE.sensorHistory);
 });
 
-// Update the active SCADA evaluation scenario
 app.post('/api/scenario', (req, res) => {
   const { scenario } = req.body;
   if (!['healthy', 'leak', 'theft'].includes(scenario)) {
@@ -313,12 +293,10 @@ app.post('/api/scenario', (req, res) => {
   }
 
   STATE.currentScenario = scenario;
-  fillHistory(); // Reset historical baseline sequence
-  
+  fillHistory();
   res.json({ success: true, scenario: STATE.currentScenario });
 });
 
-// Fetch anomaly audit records from MongoDB Cloud / Memory Fallback
 app.get('/api/logs', async (req, res) => {
   try {
     const searchVal = (req.query.search || '').toLowerCase().trim();
@@ -331,7 +309,6 @@ app.get('/api/logs', async (req, res) => {
       allLogs = localMemoryLogs;
     }
 
-    // Filter logs matching criteria
     const filtered = allLogs.filter(log => {
       const matchesSearch = log.sensorId.toLowerCase().includes(searchVal) || 
                             log.status.toLowerCase().includes(searchVal) ||
@@ -341,7 +318,6 @@ app.get('/api/logs', async (req, res) => {
       if (riskFilter !== 'all') {
         matchesRisk = log.risk.toLowerCase() === riskFilter;
       }
-
       return matchesSearch && matchesRisk;
     });
 
@@ -351,34 +327,16 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-// Clear historical logs for demonstrations
-app.delete('/api/logs', async (req, res) => {
-  try {
-    if (isDatabaseConnected) {
-      await AnomalyLog.deleteMany({});
-    } else {
-      localMemoryLogs = [];
-    }
-    res.json({ success: true, message: 'Logs cleared successfully.' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to clear logs.' });
-  }
-});
+// Serve static frontend files when running locally
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, '../')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
+  });
+  
+  app.listen(PORT, () => {
+    console.log(`Local full-stack Express server listening on http://localhost:${PORT}/`);
+  });
+}
 
-// --------------------------------------------------------------------------
-// 4. UNIFIED FILE SERVING & STATIC INDEXES
-// --------------------------------------------------------------------------
-app.use(express.static(__dirname));
-
-// Direct wildcard router to direct SPA navigations
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Start Express
-app.listen(PORT, () => {
-  console.log(`\n=============================================================`);
-  console.log(` SMART WATER LEAKAGE SYSTEM FULL-STACK BACKEND IS ONLINE!`);
-  console.log(` Web Dashboard Portal: http://localhost:${PORT}/`);
-  console.log(`=============================================================\n`);
-});
+export default app;
