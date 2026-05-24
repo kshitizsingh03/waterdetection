@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Water Leakage & Theft Detection System | BattLeDIM SCADA Dashboard</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="A premium real-time SCADA anomaly monitoring dashboard utilizing a GRU Sequence-to-Sequence Autoencoder to detect pipeline leaks and water theft.">
+  <meta name="keywords" content="Water Leakage Detection, SCADA Anomaly, GRU Autoencoder, PyTorch, BattLeDIM 2018, Smart Cities, Machine Learning, Data Visualization">
+  
+  <!-- Premium Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js CDN for interactive visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Custom Core Stylesheet -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Interactive Background Mesh -->
+  <div class="background-decorations">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- HEADER SECTION -->
+    <header class="dashboard-header glass-card">
+      <div class="header-left">
+        <div class="logo-area">
+          <svg class="logo-svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22a7 7 0 0 0 7-7c0-4.3-7-11-7-11S5 10.7 5 15a7 7 0 0 0 7 7z"/>
+            <path d="M12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" stroke-dasharray="1 1"/>
+          </svg>
+          <div class="logo-text">
+            <h1>Smart Water Leakage & Theft Detection System</h1>
+            <p class="subtitle">Real-time anomaly monitoring using GRU Seq-to-Seq Autoencoder</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <!-- Live MongoDB Connection Badge -->
+        <div id="db-status-pill" class="status-pill status-warning">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+          </svg>
+          <span id="db-status-text" class="status-label">Local Fallback</span>
+        </div>
+
+        <!-- Live System Status Badge -->
+        <div id="system-status-pill" class="status-pill status-healthy">
+          <span class="status-indicator-dot"></span>
+          <span id="system-status-text" class="status-label">Healthy</span>
+        </div>
+        
+        <!-- Live Clock -->
+        <div class="time-widget glass-pill">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span id="live-clock">02:14:44 AM</span>
+        </div>
+        
+        <!-- Theme Toggle -->
+        <button id="theme-toggle-btn" class="icon-btn glass-pill" aria-label="Toggle Theme">
+          <!-- Moon Icon (for dark mode active, click to light) -->
+          <svg class="moon-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <!-- Sun Icon (for light mode active, click to dark) -->
+          <svg class="sun-icon hidden" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- INTERACTIVE SCENARIO SIMULATOR DRAWER -->
+    <section class="simulator-panel glass-card">
+      <div class="simulator-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <h3>Live Scenario Controller</h3>
+        <span class="badge badge-accent">Demonstration Rig</span>
+      </div>
+      <div class="simulator-buttons">
+        <button id="btn-scenario-healthy" class="scenario-btn active" data-scenario="healthy">
+          <span class="scenario-dot healthy"></span>
+          <div class="scenario-info">
+            <strong>Healthy Diurnal Baseline</strong>
+            <span>Normal day/night cycles. Error is steady.</span>
+          </div>
+        </button>
+        <button id="btn-scenario-leak" class="scenario-btn" data-scenario="leak">
+          <span class="scenario-dot leak"></span>
+          <div class="scenario-info">
+            <strong>Sudden Pipeline Leak (Daytime)</strong>
+            <span>Pressure drop + Flow spike. High daytime alarm.</span>
+          </div>
+        </button>
+        <button id="btn-scenario-theft" class="scenario-btn" data-scenario="theft">
+          <span class="scenario-dot theft"></span>
+          <div class="scenario-info">
+            <strong>Slow Bypass Water Theft (Night)</strong>
+            <span>Bypasses high day limit. Tripped by night 75% adaptive threshold.</span>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- KPI CARDS GRID -->
+    <section class="kpi-grid">
+      <!-- Card 1: Network Health -->
+      <div class="kpi-card glass-card">
+        <div class="kpi-left">
+          <span class="kpi-label">Network Health</span>
+          <div class="kpi-value-container">
+            <span id="kpi-health-value" class="kpi-value">98.4%</span>
+            <span id="kpi-health-trend" class="kpi-trend trend-up">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              Optimal
+            </span>
+          </div>
+        </div>
+        <div class="kpi-right">
+          <!-- Circular Ring -->
+          <div class="svg-ring-container">
+            <svg class="progress-ring" width="60" height="60">
+              <circle class="progress-ring-bg" stroke="var(--border-color)" stroke-width="5" fill="transparent" r="24" cx="30" cy="30" />
+              <circle id="kpi-health-ring" class="progress-ring-fill" stroke="var(--accent-color)" stroke-width="5" stroke-dasharray="150.79" stroke-dashoffset="2.4" stroke-linecap="round" fill="transparent" r="24" cx="30" cy="30" />
+            </svg>
+            <div id="ring-pct-text" class="ring-overlay-text">98%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Detected Anomalies -->
+      <div class="kpi-card glass-card">
+        <div class="kpi-icon-wrapper circle-warning">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Anomalies Detected</span>
+          <div class="kpi-value-container">
+            <span id="kpi-anomalies-value" class="kpi-value">0</span>
+            <span id="kpi-anomalies-subtitle" class="kpi-desc">Last 24 Hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Avg Reconstruction Error -->
+      <div class="kpi-card glass-card">
+        <div class="kpi-icon-wrapper circle-accent">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Avg Reconstruction Error (MSE)</span>
+          <div class="kpi-value-container">
+            <span id="kpi-mse-value" class="kpi-value">0.0142</span>
+            <span id="kpi-mse-delta" class="kpi-trend trend-stable">
+              <span id="kpi-mse-status">Below Limit</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Threshold Mode -->
+      <div class="kpi-card glass-card">
+        <div class="kpi-icon-wrapper circle-blue">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Threshold Mode</span>
+          <div class="kpi-value-container">
+            <span id="kpi-threshold-value" class="kpi-value">Day (95%)</span>
+            <span id="kpi-threshold-hours" class="kpi-desc">06:01 AM – 01:59 AM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: Monitored Sensors -->
+      <div class="kpi-card glass-card">
+        <div class="kpi-icon-wrapper circle-purple">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div class="kpi-content">
+          <span class="kpi-label">Monitored SCADA Nodes</span>
+          <div class="kpi-value-container">
+            <span class="kpi-value">11</span>
+            <span class="kpi-desc">BattLeDIM Network</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN CHART AREA -->
+    <section class="chart-section glass-card">
+      <div class="chart-header">
+        <div class="chart-title-area">
+          <div class="title-with-pulse">
+            <span class="pulse-indicator pulse-normal" id="chart-pulse"></span>
+            <h2>SCADA Reconstruction Error Monitoring</h2>
+          </div>
+          <p class="subtitle">Live PyTorch GRU Autoencoder Mean Squared Error (MSE) compared against adaptive thresholds</p>
+        </div>
+        <div class="chart-controls">
+          <!-- Legend -->
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color normal"></span>Normal</span>
+            <span class="legend-item"><span class="legend-color warning"></span>Warning (Theft risk)</span>
+            <span class="legend-item"><span class="legend-color leak"></span>Leak Alarm</span>
+          </div>
+          <!-- Time Range -->
+          <div class="time-range-group glass-pill">
+            <button class="range-btn" data-hours="1">1H</button>
+            <button class="range-btn active" data-hours="6">6H</button>
+            <button class="range-btn" data-hours="24">24H</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart Canvas Wrapper -->
+      <div class="chart-container">
+        <canvas id="reconstruction-chart"></canvas>
+      </div>
+    </section>
+
+    <!-- SENSOR Telemetry GRID -->
+    <section class="section-container">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <h2>BattLeDIM Pipeline Telemetry Grid</h2>
+        </div>
+        <span class="section-desc">Active sensor values with baseline deviation indicators</span>
+      </div>
+
+      <div class="sensor-grid">
+        <!-- Sensor Card: Pressure -->
+        <div class="sensor-card glass-card" id="sensor-card-pressure">
+          <div class="sensor-top">
+            <div class="sensor-meta">
+              <span class="sensor-badge badge-blue">P-04</span>
+              <span class="sensor-name">Pipeline Pressure</span>
+            </div>
+            <span class="status-badge badge-success" id="sensor-status-pressure">Normal</span>
+          </div>
+          <div class="sensor-body">
+            <div class="sensor-numeric">
+              <span id="sensor-val-pressure" class="sensor-val">5.82</span>
+              <span class="sensor-unit">bar</span>
+            </div>
+            <!-- Dynamic CSS Mini Sparkline -->
+            <div class="sensor-sparkline">
+              <svg viewBox="0 0 100 30" class="sparkline-svg">
+                <path id="sparkline-pressure" d="M 0 15 Q 10 12, 20 18 T 40 10 T 60 22 T 80 12 T 100 15" fill="none" stroke="var(--blue-color)" stroke-width="2"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sensor Card: Flow -->
+        <div class="sensor-card glass-card" id="sensor-card-flow">
+          <div class="sensor-top">
+            <div class="sensor-meta">
+              <span class="sensor-badge badge-aqua">F-02</span>
+              <span class="sensor-name">Main Inlet Flow</span>
+            </div>
+            <span class="status-badge badge-success" id="sensor-status-flow">Normal</span>
+          </div>
+          <div class="sensor-body">
+            <div class="sensor-numeric">
+              <span id="sensor-val-flow" class="sensor-val">34.6</span>
+              <span class="sensor-unit">L/s</span>
+            </div>
+            <div class="sensor-sparkline">
+              <svg viewBox="0 0 100 30" class="sparkline-svg">
+                <path id="sparkline-flow" d="M 0 15 Q 10 20, 20 12 T 40 16 T 60 8 T 80 20 T 100 15" fill="none" stroke="var(--accent-color)" stroke-width="2"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sensor Card: Tank Level -->
+        <div class="sensor-card glass-card" id="sensor-card-tank">
+          <div class="sensor-top">
+            <div class="sensor-meta">
+              <span class="sensor-badge badge-purple">T-01</span>
+              <span class="sensor-name">Reservoir Head Level</span>
+            </div>
+            <span class="status-badge badge-success" id="sensor-status-tank">Normal</span>
+          </div>
+          <div class="sensor-body">
+            <div class="sensor-numeric">
+              <span id="sensor-val-tank" class="sensor-val">4.12</span>
+              <span class="sensor-unit">m</span>
+            </div>
+            <div class="sensor-sparkline">
+              <svg viewBox="0 0 100 30" class="sparkline-svg">
+                <path id="sparkline-tank" d="M 0 15 Q 10 14, 20 16 T 40 13 T 60 15 T 80 14 T 100 15" fill="none" stroke="var(--purple-color)" stroke-width="2"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sensor Card: Demand -->
+        <div class="sensor-card glass-card" id="sensor-card-demand">
+          <div class="sensor-top">
+            <div class="sensor-meta">
+              <span class="sensor-badge badge-grey">D-11</span>
+              <span class="sensor-name">Consumer Demand</span>
+            </div>
+            <span class="status-badge badge-success" id="sensor-status-demand">Normal</span>
+          </div>
+          <div class="sensor-body">
+            <div class="sensor-numeric">
+              <span id="sensor-val-demand" class="sensor-val">22.8</span>
+              <span class="sensor-unit">m³/h</span>
+            </div>
+            <div class="sensor-sparkline">
+              <svg viewBox="0 0 100 30" class="sparkline-svg">
+                <path id="sparkline-demand" d="M 0 15 Q 10 22, 20 10 T 40 18 T 60 12 T 80 19 T 100 15" fill="none" stroke="var(--text-secondary)" stroke-width="2"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXPLAINABILITY & RISK MAP SPLIT SECTION -->
+    <div class="split-layout">
+      
+      <!-- Left Panel: Model Explainability -->
+      <section class="explainability-panel glass-card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            <h2>GRU Autoencoder Architecture</h2>
+          </div>
+          <span class="section-desc">Sequence-to-Sequence Reconstruction Pipeline</span>
+        </div>
+        
+        <div class="architecture-flow-container">
+          <!-- Flow Nodes Diagram (HTML + CSS inline styling) -->
+          <div class="flow-chart">
+            <div class="flow-node node-input" title="11-channel SCADA sensors (Flow, Pressure)">
+              <span class="node-title">SCADA Input</span>
+              <span class="node-dims">120 &times; 11</span>
+            </div>
+            
+            <svg class="flow-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            
+            <div class="flow-node node-model" title="GRU sequential sliding window parsing">
+              <span class="node-title">Sliding Window</span>
+              <span class="node-dims">t-11 to t</span>
+            </div>
+            
+            <svg class="flow-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            
+            <div class="flow-node node-model" title="PyTorch Gated Recurrent Unit (GRU) encoder layers">
+              <span class="node-title">GRU Encoder</span>
+              <span class="node-dims">2-Layer GRU</span>
+            </div>
+            
+            <svg class="flow-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            
+            <div class="flow-node node-bottleneck" title="80-Dimensional Latent Feature Representation representing healthy system dynamics">
+              <span class="node-title">80D Latent Space</span>
+              <span class="node-dims">Bottleneck</span>
+            </div>
+            
+            <svg class="flow-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            
+            <div class="flow-node node-model" title="PyTorch GRU sequential reconstruction layer">
+              <span class="node-title">GRU Decoder</span>
+              <span class="node-dims">2-Layer GRU</span>
+            </div>
+            
+            <svg class="flow-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            
+            <div class="flow-node node-output" title="Reconstructed sequence. Healthy signals yield low MSE. Anomalies yield high MSE.">
+              <span class="node-title">SCADA Output</span>
+              <span class="node-dims">120 &times; 11</span>
+            </div>
+          </div>
+          
+          <!-- Reconstruction Logic Steps -->
+          <div class="reconstruction-equation">
+            <span class="math-term">MSE Loss:</span>
+            <code class="math-expr">L(x) = &frac1N &sum; (x_t - x'_t)&sup2;</code>
+            <span class="math-desc">Autoencoder learns only healthy profile representations. Divergent inputs cause high reconstruction MSE.</span>
+          </div>
+
+          <!-- Bottom: Confidence Dial and Details -->
+          <div class="explainability-bottom">
+            <div class="gauge-card glass-card">
+              <div class="gauge-wrapper">
+                <svg class="gauge-svg" viewBox="0 0 100 50">
+                  <path class="gauge-bg" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="var(--border-color)" stroke-width="8" stroke-linecap="round" />
+                  <path id="gauge-fill" class="gauge-fill" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="var(--accent-color)" stroke-width="8" stroke-dasharray="125.6" stroke-dashoffset="12.5" stroke-linecap="round" />
+                </svg>
+                <div class="gauge-label-group">
+                  <span id="gauge-pct" class="gauge-pct-text">92.4%</span>
+                  <span class="gauge-desc-text">Model Confidence</span>
+                </div>
+              </div>
+              <div class="gauge-status-details">
+                <h4 id="gauge-title-status">Optimal Reconstruct</h4>
+                <p id="gauge-subtitle-desc">Autoencoder MSE is tightly coupled with the baseline signature.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Pipeline Risk Heatmap -->
+      <section class="heatmap-panel glass-card">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+              <line x1="8" y1="2" x2="8" y2="18"></line>
+              <line x1="16" y1="6" x2="16" y2="22"></line>
+            </svg>
+            <h2>Pipeline Risk Heatmap</h2>
+          </div>
+          <span class="section-desc">Spatial distribution of localized anomaly risks</span>
+        </div>
+
+        <div class="heatmap-container">
+          <!-- SVG Map representing the SCADA network structure -->
+          <div class="network-svg-wrapper">
+            <svg class="network-svg" viewBox="0 0 400 240">
+              <!-- Network Grid Background -->
+              <defs>
+                <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border-color)" stroke-width="0.5"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid-pattern)" opacity="0.4" />
+              
+              <!-- Pipeline Links (Representing pipelines) -->
+              <g class="network-pipelines" stroke-width="3" stroke-linecap="round" opacity="0.8">
+                <!-- Reservoir to Central Junction -->
+                <line x1="60" y1="50" x2="140" y2="100" stroke="var(--accent-color)" id="pipe-res-junc" />
+                <!-- Central Junction to Node P1 -->
+                <line x1="140" y1="100" x2="240" y2="70" stroke="var(--accent-color)" id="pipe-junc-p1" />
+                <!-- Central Junction to Node P2 -->
+                <line x1="140" y1="100" x2="220" y2="180" stroke="var(--accent-color)" id="pipe-junc-p2" />
+                <!-- Node P1 to Tank -->
+                <line x1="240" y1="70" x2="340" y2="80" stroke="var(--accent-color)" id="pipe-p1-tank" />
+                <!-- Node P2 to Node P3 -->
+                <line x1="220" y1="180" x2="320" y2="160" stroke="var(--accent-color)" id="pipe-p2-p3" />
+                <!-- Tank to Node P3 -->
+                <line x1="340" y1="80" x2="320" y2="160" stroke="var(--accent-color)" id="pipe-tank-p3" />
+              </g>
+
+              <!-- Node points -->
+              <g class="network-nodes">
+                <!-- Reservoir -->
+                <circle cx="60" cy="50" r="8" fill="var(--blue-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="60" y="35" font-size="10" fill="var(--text-primary)" text-anchor="middle" font-weight="600">Reservoir</text>
+                
+                <!-- Central Junction -->
+                <circle cx="140" cy="100" r="6" fill="var(--accent-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="140" y="118" font-size="9" fill="var(--text-secondary)" text-anchor="middle">Junc-1</text>
+                
+                <!-- Node P1 -->
+                <circle id="node-p1" cx="240" cy="70" r="6" fill="var(--accent-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="240" y="58" font-size="9" fill="var(--text-secondary)" text-anchor="middle">Node P-01</text>
+
+                <!-- Node P2 (Source of leakage in scenario) -->
+                <circle id="node-p2" cx="220" cy="180" r="6" fill="var(--accent-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="220" y="198" font-size="9" fill="var(--text-secondary)" text-anchor="middle">Node P-04</text>
+                
+                <!-- Tank Reservoir -->
+                <circle cx="340" cy="80" r="7" fill="var(--purple-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="340" y="65" font-size="10" fill="var(--text-primary)" text-anchor="middle" font-weight="600">Tank T-01</text>
+
+                <!-- Node P3 (Water Theft source node) -->
+                <circle id="node-p3" cx="320" cy="160" r="6" fill="var(--accent-color)" stroke="var(--bg-card)" stroke-width="2"/>
+                <text x="320" y="178" font-size="9" fill="var(--text-secondary)" text-anchor="middle">Node D-11</text>
+              </g>
+            </svg>
+          </div>
+          <!-- Heatmap Legend -->
+          <div class="heatmap-legend">
+            <span class="legend-scale"><span class="legend-scale-color color-low"></span>Low Risk (Healthy)</span>
+            <span class="legend-scale"><span class="legend-scale-color color-med"></span>Medium Risk (Warning)</span>
+            <span class="legend-scale"><span class="legend-scale-color color-high"></span>High Risk (Leak/Theft)</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- LEAK ANALYSIS TABLE SECTION -->
+    <section class="table-section glass-card">
+      <div class="table-header-row">
+        <div class="table-header-left">
+          <h2>Anomalous Event & Leak Logs</h2>
+          <p class="subtitle">Search, filter, and audit history logs generated by the adaptive autoencoder</p>
+        </div>
+        
+        <div class="table-actions">
+          <!-- Search Input -->
+          <div class="search-box glass-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" placeholder="Search by Sensor ID or Status...">
+          </div>
+
+          <!-- Dropdown Filter -->
+          <div class="filter-box glass-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <select id="filter-risk" aria-label="Filter by Risk Level">
+              <option value="all">All Risk Levels</option>
+              <option value="low">Low Risk</option>
+              <option value="medium">Medium Risk</option>
+              <option value="high">High Risk</option>
+            </select>
+          </div>
+
+          <!-- Export CSV -->
+          <button id="export-csv-btn" class="action-btn-accent glass-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Logs Table -->
+      <div class="table-responsive">
+        <table class="logs-table" id="logs-table">
+          <thead>
+            <tr>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Sensor ID</th>
+              <th scope="col">MSE</th>
+              <th scope="col">Threshold Limit</th>
+              <th scope="col">Risk Level</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- Dynamic Rows will be inserted by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Pagination Footer -->
+      <div class="table-pagination">
+        <span class="pagination-info" id="pagination-info">Showing 1 to 5 of 5 entries</span>
+        <div class="pagination-buttons">
+          <button class="page-btn glass-pill" id="btn-prev" disabled>Previous</button>
+          <button class="page-btn glass-pill" id="btn-next" disabled>Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER SECTION -->
+    <footer class="dashboard-footer glass-card">
+      <div class="footer-left">
+        <span>Dataset: <strong>BattLeDIM 2018</strong></span>
+        <span class="divider">|</span>
+        <span>Framework: <strong>PyTorch 2.2</strong></span>
+        <span class="divider">|</span>
+        <span>Model: <strong>GRU Sequence-to-Sequence Autoencoder</strong></span>
+      </div>
+      <div class="footer-right">
+        <span>MCA Academic Project &copy; 2026</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Custom Core Logic Script -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
