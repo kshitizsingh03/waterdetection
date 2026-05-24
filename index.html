@@ -36,28 +36,9 @@
         <p id="lock-subtitle">Access authorization is required to pull pipeline telemetry</p>
       </div>
 
-      <!-- Screen A: Password Setup (First Time Only) -->
-      <div id="screen-setup" class="lock-screen-content hidden">
-        <p class="lock-instructions">Configure a new Master Password for this PC local workspace.</p>
-        <form id="form-setup" class="lock-form">
-          <div class="input-group">
-            <label for="setup-pw">New Password</label>
-            <input type="password" id="setup-pw" placeholder="Enter master password..." required autocomplete="new-password">
-          </div>
-          <div class="input-group">
-            <label for="setup-pw-confirm">Confirm Password</label>
-            <input type="password" id="setup-pw-confirm" placeholder="Confirm master password..." required autocomplete="new-password">
-          </div>
-          <p id="setup-error" class="form-error-msg hidden">Passwords do not match.</p>
-          <button type="submit" class="action-btn-accent lock-submit-btn">
-            Create Master Access Code
-          </button>
-        </form>
-      </div>
-
-      <!-- Screen B: Password Login (Subsequent Loads) -->
+      <!-- Simple Password Login Screen -->
       <div id="screen-login" class="lock-screen-content">
-        <p class="lock-instructions">Enter password to authorize full-stack dashboard synchronization.</p>
+        <p class="lock-instructions">Enter the master password to access the full-stack dashboard.</p>
         <form id="form-login" class="lock-form">
           <div class="input-group password-wrapper-group">
             <label for="login-pw">Master Password</label>

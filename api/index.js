@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import util from 'util';
 
 const execPromise = util.promisify(exec);
@@ -289,40 +289,8 @@ setInterval(() => {
 // --------------------------------------------------------------------------
 
 app.get('/api/auth/status', async (req, res) => {
-  try {
-    let isSet = false;
-    if (isDatabaseConnected) {
-      const lock = await SecurityLock.findOne();
-      isSet = !!lock;
-    } else {
-      isSet = !!localMemoryPasswordHash;
-    }
-    res.json({ isSet });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/auth/setup', async (req, res) => {
-  try {
-    const { password } = req.body;
-    if (!password || password.length < 4) {
-      return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
-    }
-    
-    const hash = hashPasswordOnServer(password);
-    
-    if (isDatabaseConnected) {
-      await SecurityLock.deleteMany({});
-      await SecurityLock.create({ passwordHash: hash });
-    } else {
-      localMemoryPasswordHash = hash;
-    }
-    
-    res.json({ success: true, message: 'Master password configured successfully.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  // Always return isSet true for the easy login system
+  res.json({ isSet: true });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -332,26 +300,13 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Password is required.' });
     }
     
-    const inputHash = hashPasswordOnServer(password);
-    let storedHash = null;
+    // Easy login check against environment variable or hardcoded 'admin'
+    const validPassword = process.env.MASTER_PASSWORD || 'admin';
     
-    if (isDatabaseConnected) {
-      const lock = await SecurityLock.findOne();
-      if (lock) {
-        storedHash = lock.passwordHash;
-      }
-    } else {
-      storedHash = localMemoryPasswordHash;
-    }
-    
-    if (!storedHash) {
-      return res.status(400).json({ error: 'No master password set. Please configure setup first.' });
-    }
-    
-    if (inputHash === storedHash) {
+    if (password === validPassword) {
       res.json({ success: true, authorized: true });
     } else {
-      res.status(401).json({ error: 'Invalid master access code.' });
+      res.status(401).json({ error: 'Invalid master access code. Try "admin"' });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -428,11 +383,22 @@ app.post('/api/scan', async (req, res) => {
         demand: d
       };
 
-      const jsonStr = JSON.stringify(payload).replace(/"/g, '\\"');
       const scriptPath = path.join(__dirname, '../gru_ae_infer.py');
       
-      const { stdout } = await execPromise(`python "${scriptPath}" "${jsonStr}"`);
-      const pyData = JSON.parse(stdout.trim());
+      const pyData = await new Promise((resolve, reject) => {
+        const pyProc = spawn('python', [scriptPath]);
+        let out = '';
+        let err = '';
+        pyProc.stdout.on('data', d => out += d.toString());
+        pyProc.stderr.on('data', d => err += d.toString());
+        pyProc.on('close', code => {
+          if (code !== 0) return reject(new Error('Python failed: ' + err));
+          try { resolve(JSON.parse(out.trim())); } 
+          catch (e) { reject(new Error('Invalid JSON from python: ' + out)); }
+        });
+        pyProc.stdin.write(JSON.stringify(payload));
+        pyProc.stdin.end();
+      });
       
       if (pyData && pyData.success) {
         scanResult = {

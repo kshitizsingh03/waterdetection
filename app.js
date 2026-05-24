@@ -684,37 +684,13 @@ function isNightHours(date) {
 // --------------------------------------------------------------------------
 
 async function checkSecurityLock() {
-  const screenSetup = document.getElementById('screen-setup');
   const screenLogin = document.getElementById('screen-login');
   const lockModal = document.getElementById('lock-screen-modal');
-
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/status`);
-    const data = await response.json();
-
-    if (!data.isSet) {
-      screenSetup.classList.remove('hidden');
-      screenLogin.classList.add('hidden');
-      lockModal.classList.remove('slide-up');
-      lockModal.classList.remove('hidden');
-    } else {
-      screenSetup.classList.add('hidden');
-      screenLogin.classList.remove('hidden');
-      lockModal.classList.remove('slide-up');
-      lockModal.classList.remove('hidden');
-    }
-  } catch (err) {
-    console.error('Failed to check security status:', err);
-    // Fallback to local security if backend is offline
-    const stored = localStorage.getItem('masterPassword');
-    if (!stored) {
-      screenSetup.classList.remove('hidden');
-      screenLogin.classList.add('hidden');
-    } else {
-      screenSetup.classList.add('hidden');
-      screenLogin.classList.remove('hidden');
-    }
-  }
+  
+  // Just show the login screen
+  screenLogin.classList.remove('hidden');
+  lockModal.classList.remove('slide-up');
+  lockModal.classList.remove('hidden');
 }
 
 function unlockDashboard() {
@@ -788,41 +764,8 @@ async function bootstrapApp() {
   }, 1000);
 
   // 1. Security Lock Screen Form Bindings (Full-Stack Backend Validated)
-  const formSetup = document.getElementById('form-setup');
-  if (formSetup) {
-    formSetup.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const pwVal = document.getElementById('setup-pw').value;
-      const pwConfirmVal = document.getElementById('setup-pw-confirm').value;
-      const errorMsg = document.getElementById('setup-error');
-      
-      if (pwVal !== pwConfirmVal) {
-        errorMsg.textContent = 'Passwords do not match.';
-        errorMsg.classList.remove('hidden');
-        return;
-      }
-      
-      try {
-        const response = await fetch(`${API_BASE}/api/auth/setup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: pwVal })
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          errorMsg.classList.add('hidden');
-          unlockDashboard();
-        } else {
-          errorMsg.textContent = data.error || 'Configuration failed.';
-          errorMsg.classList.remove('hidden');
-        }
-      } catch (err) {
-        errorMsg.textContent = 'Backend auth server unreachable.';
-        errorMsg.classList.remove('hidden');
-      }
-    });
-  }
+  // Setup logic removed for simple hardcoded easy login
+
 
   const formLogin = document.getElementById('form-login');
   if (formLogin) {
