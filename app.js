@@ -975,6 +975,20 @@ async function bootstrapApp() {
           
           const outcomeEl = document.getElementById('scan-res-outcome');
           const badgeEl = document.getElementById('scan-res-badge');
+          const nodeEl = document.getElementById('scan-inference-node');
+          
+          if (nodeEl && data.inferenceNode) {
+            nodeEl.textContent = data.inferenceNode;
+            if (data.inferenceNode.includes("Python")) {
+              nodeEl.style.backgroundColor = "var(--blue-color-light)";
+              nodeEl.style.color = "var(--blue-color)";
+              nodeEl.style.border = "1px solid hsla(var(--hue-blue), 83%, 53%, 0.3)";
+            } else {
+              nodeEl.style.backgroundColor = "var(--accent-color-light)";
+              nodeEl.style.color = "var(--accent-color)";
+              nodeEl.style.border = "1px solid hsla(var(--hue-accent), 94%, 43%, 0.3)";
+            }
+          }
           
           if (data.hasBreached) {
             outcomeEl.textContent = 'WATER IS LEAKING';

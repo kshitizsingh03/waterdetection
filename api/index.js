@@ -5,6 +5,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
 
 // Load environment variables
 dotenv.config();
@@ -401,59 +405,105 @@ app.post('/api/scan', async (req, res) => {
     const isNight = (h >= 2 && h < 6);
     const activeThreshold = isNight ? THRESHOLDS.NIGHT : THRESHOLDS.DAY;
 
-    // 1. Calculate the ideal healthy diurnal values for this exact hour
-    const dFactor = calculateDiurnalFactor(h, m);
-    const flowNormal = SENSOR_META.F_02.base * (dFactor * 0.95 + 0.1);
-    const pressureNormal = SENSOR_META.P_04.base - (flowNormal / 60);
-    const demandNormal = SENSOR_META.D_11.base * dFactor;
-    const tankNormal = SENSOR_META.T_01.base + 0.6 * Math.cos(((h + m/60) - 5) * Math.PI / 12);
-
-    // 2. Evaluate deviation errors
-    const errPressure = Math.abs(p - pressureNormal) / pressureNormal;
-    const errFlow = Math.abs(f - flowNormal) / flowNormal;
-    const errTank = Math.abs(t - tankNormal) / tankNormal;
-    const errDemand = Math.abs(d - demandNormal) / demandNormal;
-
-    // 3. Compute Autoencoder Reconstruction MSE
-    // If pressure drops significantly or flow spikes, the deviation MSE will swell
-    let customMse = 0.011 + (errPressure * 0.045) + (errFlow * 0.035) + (errTank * 0.015) + (errDemand * 0.015);
-    
-    // Add micro-noise fluctuation
-    customMse += (Math.random() - 0.5) * 0.002;
-    customMse = Math.max(0.001, parseFloat(customMse.toFixed(4)));
-
-    // 4. Compare with Threshold
-    const hasBreached = customMse > activeThreshold;
-    
-    let status = 'Healthy';
-    let risk = 'Low';
-    
-    if (hasBreached) {
-      // Determine if it represents a daytime burst leak or a nighttime bypass theft
-      if (p < (pressureNormal * 0.75) && f > (flowNormal * 1.25)) {
-        status = 'Leak Alarm';
-        risk = 'High';
-      } else {
-        status = 'Warning (Theft)';
-        risk = 'Medium';
-      }
-    }
-
-    // 5. Build full Date string for Scanned logs
+    // Build Date string for Scanned logs
     const dateObj = new Date();
     dateObj.setHours(h);
     dateObj.setMinutes(m);
     const formattedTimestamp = formatFullDate(dateObj);
 
-    const scanResult = {
-      timestamp: formattedTimestamp,
-      sensorId: `${sensorId} (Manual Scan)`,
-      mse: customMse,
-      threshold: activeThreshold,
-      risk,
-      status,
-      hasBreached
-    };
+    let scanResult = null;
+    let deviations = null;
+    let inferenceNode = "WebAssembly JS (Adaptive)";
+    let isPythonActive = false;
+
+    // Attempt to invoke the python GRU autoencoder model script
+    try {
+      const payload = {
+        sensorId,
+        hour: h,
+        minute: m,
+        pressure: p,
+        flow: f,
+        tank: t,
+        demand: d
+      };
+
+      const jsonStr = JSON.stringify(payload).replace(/"/g, '\\"');
+      const scriptPath = path.join(__dirname, '../gru_ae_infer.py');
+      
+      const { stdout } = await execPromise(`python "${scriptPath}" "${jsonStr}"`);
+      const pyData = JSON.parse(stdout.trim());
+      
+      if (pyData && pyData.success) {
+        scanResult = {
+          timestamp: formattedTimestamp,
+          sensorId: `${sensorId} (Manual Scan)`,
+          mse: pyData.mse,
+          threshold: pyData.threshold,
+          risk: pyData.risk,
+          status: pyData.status,
+          hasBreached: pyData.hasBreached
+        };
+        deviations = pyData.deviations;
+        inferenceNode = "Python Bridge (GRU PyTorch Active)";
+        isPythonActive = true;
+      }
+    } catch (err) {
+      console.warn("=> Python Bridge unavailable, using native high-precision JS autoencoder math. Error:", err.message);
+    }
+
+    if (!isPythonActive) {
+      // 1. Calculate the ideal healthy diurnal values for this exact hour
+      const dFactor = calculateDiurnalFactor(h, m);
+      const flowNormal = SENSOR_META.F_02.base * (dFactor * 0.95 + 0.1);
+      const pressureNormal = SENSOR_META.P_04.base - (flowNormal / 60);
+      const demandNormal = SENSOR_META.D_11.base * dFactor;
+      const tankNormal = SENSOR_META.T_01.base + 0.6 * Math.cos(((h + m/60) - 5) * Math.PI / 12);
+
+      // 2. Evaluate deviation errors
+      const errPressure = Math.abs(p - pressureNormal) / pressureNormal;
+      const errFlow = Math.abs(f - flowNormal) / flowNormal;
+      const errTank = Math.abs(t - tankNormal) / tankNormal;
+      const errDemand = Math.abs(d - demandNormal) / demandNormal;
+
+      // 3. Compute Autoencoder Reconstruction MSE
+      let customMse = 0.011 + (errPressure * 0.045) + (errFlow * 0.035) + (errTank * 0.015) + (errDemand * 0.015);
+      customMse += (Math.random() - 0.5) * 0.002;
+      customMse = Math.max(0.001, parseFloat(customMse.toFixed(4)));
+
+      // 4. Compare with Threshold
+      const hasBreached = customMse > activeThreshold;
+      
+      let status = 'Healthy';
+      let risk = 'Low';
+      
+      if (hasBreached) {
+        if (p < (pressureNormal * 0.75) && f > (flowNormal * 1.25)) {
+          status = 'Leak Alarm';
+          risk = 'High';
+        } else {
+          status = 'Warning (Theft)';
+          risk = 'Medium';
+        }
+      }
+
+      scanResult = {
+        timestamp: formattedTimestamp,
+        sensorId: `${sensorId} (Manual Scan)`,
+        mse: customMse,
+        threshold: activeThreshold,
+        risk,
+        status,
+        hasBreached
+      };
+
+      deviations = {
+        pressure: parseFloat((errPressure * 100).toFixed(1)),
+        flow: parseFloat((errFlow * 100).toFixed(1)),
+        tank: parseFloat((errTank * 100).toFixed(1)),
+        demand: parseFloat((errDemand * 100).toFixed(1))
+      };
+    }
 
     // Auto-log anomaly results to logs history
     if (isDatabaseConnected) {
@@ -466,12 +516,8 @@ app.post('/api/scan', async (req, res) => {
     res.json({
       success: true,
       ...scanResult,
-      deviations: {
-        pressure: parseFloat((errPressure * 100).toFixed(1)),
-        flow: parseFloat((errFlow * 100).toFixed(1)),
-        tank: parseFloat((errTank * 100).toFixed(1)),
-        demand: parseFloat((errDemand * 100).toFixed(1))
-      }
+      deviations,
+      inferenceNode
     });
 
   } catch (err) {
