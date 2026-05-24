@@ -684,11 +684,22 @@ function isNightHours(date) {
 // --------------------------------------------------------------------------
 
 async function checkSecurityLock() {
+  const screenSetup = document.getElementById('screen-setup');
   const screenLogin = document.getElementById('screen-login');
   const lockModal = document.getElementById('lock-screen-modal');
   
-  // Just show the login screen
-  screenLogin.classList.remove('hidden');
+  const savedUser = localStorage.getItem('localUserPass');
+  
+  if (!savedUser) {
+    // Show Sign Up
+    screenSetup.classList.remove('hidden');
+    screenLogin.classList.add('hidden');
+  } else {
+    // Show Login
+    screenSetup.classList.add('hidden');
+    screenLogin.classList.remove('hidden');
+  }
+
   lockModal.classList.remove('slide-up');
   lockModal.classList.remove('hidden');
 }
@@ -763,37 +774,54 @@ async function bootstrapApp() {
     }
   }, 1000);
 
-  // 1. Security Lock Screen Form Bindings (Full-Stack Backend Validated)
-  // Setup logic removed for simple hardcoded easy login
+  // 1. Security Lock Screen Form Bindings (Local Storage Fallback)
+  const formSetup = document.getElementById('form-setup');
+  if (formSetup) {
+    formSetup.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nameVal = document.getElementById('setup-name').value;
+      const pwVal = document.getElementById('setup-pw').value;
+      const pwConfirmVal = document.getElementById('setup-pw-confirm').value;
+      const errorMsg = document.getElementById('setup-error');
+      
+      if (pwVal !== pwConfirmVal) {
+        errorMsg.textContent = 'Passwords do not match.';
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+      
+      localStorage.setItem('localUserName', nameVal);
+      localStorage.setItem('localUserPass', pwVal);
+      
+      errorMsg.classList.add('hidden');
+      unlockDashboard();
+    });
+  }
 
+  const linkToLogin = document.getElementById('link-to-login');
+  if (linkToLogin) {
+    linkToLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('screen-setup').classList.add('hidden');
+      document.getElementById('screen-login').classList.remove('hidden');
+    });
+  }
 
   const formLogin = document.getElementById('form-login');
   if (formLogin) {
-    formLogin.addEventListener('submit', async (e) => {
+    formLogin.addEventListener('submit', (e) => {
       e.preventDefault();
       const inputPw = document.getElementById('login-pw').value;
       const errorMsg = document.getElementById('login-error');
       
-      try {
-        const response = await fetch(`${API_BASE}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: inputPw })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.authorized) {
-            errorMsg.classList.add('hidden');
-            unlockDashboard();
-          }
-        } else {
-          const data = await response.json();
-          errorMsg.textContent = data.error || 'Incorrect master access code.';
-          errorMsg.classList.remove('hidden');
-        }
-      } catch (err) {
-        errorMsg.textContent = 'Backend auth server unreachable.';
+      const storedPw = localStorage.getItem('localUserPass');
+      
+      // Fallback valid password to "admin"
+      if (inputPw === storedPw || inputPw === 'admin') {
+        errorMsg.classList.add('hidden');
+        unlockDashboard();
+      } else {
+        errorMsg.textContent = 'Incorrect password.';
         errorMsg.classList.remove('hidden');
       }
     });
