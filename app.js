@@ -49,6 +49,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const consoleLogs = document.getElementById('console-logs');
   const btnClearConsole = document.getElementById('btn-clear-console');
 
+  // --- Audio Alarm System ---
+  let audioCtx = null;
+  let alarmInterval = null;
+
+  function triggerAlarm() {
+    if (alarmInterval) clearInterval(alarmInterval);
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    let beeps = 0;
+    const maxBeeps = 6; // 6 seconds
+
+    alarmInterval = setInterval(() => {
+      if (beeps >= maxBeeps) {
+        clearInterval(alarmInterval);
+        return;
+      }
+      
+      // SCADA double-beep pattern
+      playBeep(880, 0.15, 0);       
+      playBeep(880, 0.15, 0.2);     
+
+      beeps++;
+    }, 1000);
+  }
+
+  function playBeep(frequency, duration, delay) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'square';
+    osc.frequency.value = frequency;
+    
+    const startTime = audioCtx.currentTime + delay;
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.05, startTime + 0.02);
+    gain.gain.setValueAtTime(0.05, startTime + duration - 0.02);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
   // --- Preconfigured telemetry data ---
   const normalSample = [
     28.2048, 33.2571, 36.6379, 36.9094, 50.2350, 53.6492, 52.2349, 54.9353, 39.0802, 52.1226, 
@@ -316,6 +364,9 @@ document.addEventListener('DOMContentLoaded', () => {
         valStatus.textContent = "LEAK ALARM";
         valStatus.className = "stat-value text-danger";
         writeLog(`Anomaly Detected! MSE: ${mse.toFixed(6)} > ${threshold.toFixed(6)}`, 'error');
+        
+        // Trigger 6-second audible SCADA alarm
+        triggerAlarm();
       } else {
         valStatus.textContent = "SECURE";
         valStatus.className = "stat-value text-success";
