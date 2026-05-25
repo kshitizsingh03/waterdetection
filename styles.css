@@ -532,42 +532,79 @@ textarea:focus {
   overflow: hidden;
 }
 
-/* WATER SCAN ANIMATION */
+/* CREATIVE PIPE VISUALIZER ANIMATIONS */
 .water-scan-svg {
   width: 100%;
-  max-width: 250px;
+  max-width: 400px;
+  height: auto;
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.2));
 }
 
-.water-bg {
-  fill: var(--bg-secondary);
-  stroke: var(--border-color);
-  stroke-width: 4;
+/* Base Flow */
+.water-flow {
+  transition: fill 0.5s ease;
 }
 
-.water-fill {
-  fill: var(--color-primary);
-  opacity: 0.2;
+/* Animated flow lines */
+.flow-line {
+  stroke-dasharray: 20 100;
+  animation: flowAnim 4s linear infinite;
+}
+.flow-line-2 {
+  stroke-dasharray: 40 80;
+  animation: flowAnim 6s linear infinite reverse;
+}
+.flow-line-3 {
+  stroke-dasharray: 10 50;
+  animation: flowAnim 3s linear infinite;
 }
 
-.water-wave {
-  fill: var(--color-primary);
-  transform-origin: bottom;
-  transform: translateY(100%);
-  transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+@keyframes flowAnim {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 200; }
 }
 
-.water-wave.scanning {
-  transform: translateY(0%);
-  animation: waveMotion 1s infinite alternate ease-in-out;
+/* Scanner Beam */
+.scanner-group {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: opacity 0.3s ease;
 }
 
-.water-wave.leak {
-  fill: var(--color-danger);
+.scanner-group.scanning {
+  opacity: 1;
+  animation: scanBeam 1.5s ease-in-out infinite alternate;
 }
 
-@keyframes waveMotion {
-  from { d: path('M 0 50 Q 50 40 100 50 T 200 50 L 200 200 L 0 200 Z'); }
-  to { d: path('M 0 50 Q 50 60 100 50 T 200 50 L 200 200 L 0 200 Z'); }
+@keyframes scanBeam {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(270px); }
+}
+
+/* Leak Mode */
+.water-flow.leak {
+  fill: url(#water-leak);
+}
+
+.particle {
+  animation: particleFloat 1s ease-in infinite;
+}
+.particle-1 { animation-delay: 0s; }
+.particle-2 { animation-delay: 0.3s; }
+.particle-3 { animation-delay: 0.6s; }
+
+@keyframes particleFloat {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-40px) scale(0); opacity: 0; }
+}
+
+.leak-ring {
+  animation: pulseRing 1.5s ease-out infinite;
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
 }
 
 .pipeline-alert-overlay {

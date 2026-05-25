@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -73,8 +73,8 @@
       <div class="header-actions">
         <!-- Day/Night Theme Toggle -->
         <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Day/Night Mode">
-          <svg class="icon" id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg class="icon hidden" id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="icon hidden" id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon" id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
 
         <div class="operator-profile">
@@ -177,23 +177,82 @@
 
             <!-- Cool Water Scanning SVG -->
             <div class="pipeline-schematic-container">
-              <svg class="water-scan-svg" viewBox="0 0 200 200">
+              <svg class="water-scan-svg" viewBox="0 0 400 200">
                 <defs>
-                  <clipPath id="water-mask">
-                    <rect x="0" y="50" width="200" height="150" rx="12" />
+                  <!-- Metallic Pipe Gradient -->
+                  <linearGradient id="pipe-metal" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#64748b" />
+                    <stop offset="25%" stop-color="#94a3b8" />
+                    <stop offset="50%" stop-color="#334155" />
+                    <stop offset="100%" stop-color="#0f172a" />
+                  </linearGradient>
+                  
+                  <!-- Inner Pipe shadow -->
+                  <linearGradient id="pipe-inner" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#020617" />
+                    <stop offset="30%" stop-color="#0f172a" />
+                    <stop offset="100%" stop-color="#1e293b" />
+                  </linearGradient>
+
+                  <!-- Normal Water Gradient -->
+                  <linearGradient id="water-normal" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.2"/>
+                    <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.8"/>
+                    <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.2"/>
+                  </linearGradient>
+
+                  <!-- Leak Water Gradient -->
+                  <linearGradient id="water-leak" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+                    <stop offset="50%" stop-color="#f87171" stop-opacity="0.8"/>
+                    <stop offset="100%" stop-color="#ef4444" stop-opacity="0.2"/>
+                  </linearGradient>
+
+                  <!-- Clip path to keep water inside pipe -->
+                  <clipPath id="inner-pipe-clip">
+                    <rect x="40" y="65" width="320" height="70" />
                   </clipPath>
                 </defs>
-                
-                <!-- Tank Outline -->
-                <rect class="water-bg" x="0" y="50" width="200" height="150" rx="12" />
-                <path class="water-bg" d="M80 50 L80 10 L120 10 L120 50" fill="none" />
-                
-                <!-- Water Fill (Static) -->
-                <rect class="water-fill" x="0" y="50" width="200" height="150" rx="12" />
 
-                <!-- Dynamic Scanning Wave -->
-                <g clip-path="url(#water-mask)">
-                  <path id="water-wave" class="water-wave" d="M 0 50 Q 50 40 100 50 T 200 50 L 200 200 L 0 200 Z" />
+                <!-- Flange Left -->
+                <rect x="10" y="45" width="30" height="110" rx="5" fill="url(#pipe-metal)" stroke="#020617" stroke-width="2" />
+                <circle cx="25" cy="55" r="3" fill="#0f172a" />
+                <circle cx="25" cy="145" r="3" fill="#0f172a" />
+
+                <!-- Flange Right -->
+                <rect x="360" y="45" width="30" height="110" rx="5" fill="url(#pipe-metal)" stroke="#020617" stroke-width="2" />
+                <circle cx="375" cy="55" r="3" fill="#0f172a" />
+                <circle cx="375" cy="145" r="3" fill="#0f172a" />
+
+                <!-- Main Pipe Body Outer -->
+                <rect x="40" y="55" width="320" height="90" fill="url(#pipe-metal)" stroke="#020617" stroke-width="2" />
+                
+                <!-- Main Pipe Body Inner (Cutaway View) -->
+                <rect x="40" y="65" width="320" height="70" fill="url(#pipe-inner)" />
+
+                <!-- Flowing Water inside Cutaway -->
+                <g clip-path="url(#inner-pipe-clip)">
+                  <!-- Base Water Layer -->
+                  <rect id="water-flow" x="40" y="65" width="320" height="70" fill="url(#water-normal)" class="water-flow" />
+                  
+                  <!-- Flow Lines -->
+                  <path class="flow-line" d="M 40 80 Q 200 70 360 80" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" />
+                  <path class="flow-line-2" d="M 40 100 Q 200 110 360 100" stroke="#7dd3fc" stroke-width="1.5" fill="none" opacity="0.4" />
+                  <path class="flow-line-3" d="M 40 120 Q 200 115 360 120" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.5" />
+                  
+                  <!-- AI Scanner Beam (only active during scan) -->
+                  <g id="scanner-beam" class="scanner-group">
+                    <rect x="40" y="65" width="4" height="70" fill="#38bdf8" />
+                    <polygon points="44,65 120,65 120,135 44,135" fill="url(#water-normal)" opacity="0.4" />
+                  </g>
+
+                  <!-- Leak Particles (only active during leak) -->
+                  <g id="leak-particles" class="hidden">
+                    <circle cx="200" cy="100" r="4" fill="#fecaca" class="particle particle-1" />
+                    <circle cx="220" cy="90" r="3" fill="#fecaca" class="particle particle-2" />
+                    <circle cx="180" cy="110" r="5" fill="#fecaca" class="particle particle-3" />
+                    <circle cx="200" cy="100" r="25" fill="none" stroke="#ef4444" stroke-width="2" class="leak-ring" />
+                  </g>
                 </g>
               </svg>
             </div>

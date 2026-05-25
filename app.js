@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnThemeToggle = document.getElementById('btn-theme-toggle');
   const iconSun = document.getElementById('icon-sun');
   const iconMoon = document.getElementById('icon-moon');
-  let isNightMode = false;
+  let isNightMode = true;
   
   // Stats
   const valStatus = document.getElementById('val-status');
@@ -38,7 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnLoadLeak = document.getElementById('btn-load-leak');
   
   // Pipeline Visuals
-  const waterWave = document.getElementById('water-wave');
+  const waterFlow = document.getElementById('water-flow');
+  const scannerBeam = document.getElementById('scanner-beam');
+  const leakParticles = document.getElementById('leak-particles');
   const visStatusOverlay = document.getElementById('visualizer-status-overlay');
   
   // High-Tech Gauge & Console Log elements
@@ -239,8 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
     valMse.textContent = "0.000000";
     valMse.className = "stat-value text-primary";
     
-    waterWave.classList.remove('leak');
-    waterWave.classList.remove('scanning');
+    waterFlow.classList.remove('leak');
+    scannerBeam.classList.remove('scanning');
+    leakParticles.classList.add('hidden');
     
     gaugeBar.style.width = "0%";
     gaugeBar.className = "gauge-bar-inner";
@@ -286,8 +289,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       btnPredict.disabled = true;
       btnPredict.textContent = 'Scanning...';
-      waterWave.classList.add('scanning');
-      waterWave.classList.remove('leak');
+      scannerBeam.classList.add('scanning');
+      waterFlow.classList.remove('leak');
+      leakParticles.classList.add('hidden');
       writeLog("Analyzing telemetry packet...", 'info');
 
       // UI Scan Animation Delay
@@ -325,18 +329,20 @@ document.addEventListener('DOMContentLoaded', () => {
       gaugeRatio.textContent = ratio.toFixed(1) + "%";
       gaugeBar.style.width = ratio + "%";
       
-      waterWave.classList.remove('scanning');
+      scannerBeam.classList.remove('scanning');
 
       if (isLeak) {
         gaugeBar.className = "gauge-bar-inner gauge-bar-leak";
-        waterWave.classList.add('leak');
+        waterFlow.classList.add('leak');
+        leakParticles.classList.remove('hidden');
         visStatusOverlay.innerHTML = `
           <span class="visualizer-status-badge status-leak">CRITICAL LEAK DETECTED</span>
           <p class="visualizer-status-description">Loss ratio reached ${ratio.toFixed(1)}% of maximum safe threshold.</p>
         `;
       } else {
         gaugeBar.className = "gauge-bar-inner";
-        waterWave.classList.remove('leak');
+        waterFlow.classList.remove('leak');
+        leakParticles.classList.add('hidden');
         visStatusOverlay.innerHTML = `
           <span class="visualizer-status-badge status-normal">HEALTHY</span>
           <p class="visualizer-status-description">Flow stable at ${ratio.toFixed(1)}% of threshold.</p>
@@ -373,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       btnPredict.disabled = false;
       btnPredict.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Analyze Telemetry';
-      waterWave.classList.remove('scanning');
+      scannerBeam.classList.remove('scanning');
     }
   });
 
