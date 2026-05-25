@@ -1,4 +1,4 @@
-/* High-Performance Browser-Side SCADA Core & ONNX Inference Controller */
+/* High-Performance Cyber-SCADA Core & ONNX Inference Controller */
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- DOM Elements ---
@@ -41,7 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const leakageSpray = document.getElementById('leakage-spray');
   
   const visStatusOverlay = document.getElementById('visualizer-status-overlay');
-  const visualizerDesc = document.getElementById('visualizer-desc');
+  
+  // High-Tech Gauge & Console Log elements
+  const gaugeBar = document.getElementById('gauge-bar');
+  const gaugeRatio = document.getElementById('gauge-ratio');
+  const consoleLogs = document.getElementById('console-logs');
+  const btnClearConsole = document.getElementById('btn-clear-console');
 
   // --- Preconfigured telemetry data ---
   const normalSample = [
@@ -61,6 +66,33 @@ document.addEventListener('DOMContentLoaded', () => {
   let scaler = null;
   let session = null;
 
+  // --- High-Tech Logger ---
+  function writeLog(message, type = 'info') {
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    
+    let typeBadge = '[INFO]';
+    if (type === 'success') typeBadge = '[OK]';
+    if (type === 'warning') typeBadge = '[WARN]';
+    if (type === 'error') typeBadge = '[FAIL]';
+
+    const logLine = document.createElement('div');
+    logLine.className = 'console-line';
+    logLine.innerHTML = `
+      <span class="log-time">[${timeStr}]</span> 
+      <span class="log-${type}">${typeBadge}</span> ${message}
+    `;
+    
+    consoleLogs.appendChild(logLine);
+    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+  }
+
+  // Clear Event Log
+  btnClearConsole.addEventListener('click', () => {
+    consoleLogs.innerHTML = '';
+    writeLog("System Event Log cleared by operator.");
+  });
+
   // --- Auth Flow & Operator Account Persistence ---
   function getOperator() {
     const operatorStr = localStorage.getItem('operatorAccount');
@@ -75,17 +107,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // User is logged in
       authPortal.classList.add('hidden');
       scadaDashboard.classList.remove('hidden');
-      operatorDisplayName.textContent = operator.name;
+      operatorDisplayName.textContent = operator.name.toUpperCase();
+      writeLog(`Operator ${operator.name.toUpperCase()} authenticated. SCADA terminal session active.`, 'success');
       initONNX();
     } else {
       // Show login or register screen
       scadaDashboard.classList.add('hidden');
       authPortal.classList.remove('hidden');
       if (operator) {
-        // Toggle to login screen
         showLoginForm();
       } else {
-        // Toggle to signup screen
         showSignupForm();
       }
     }
@@ -94,15 +125,15 @@ document.addEventListener('DOMContentLoaded', () => {
   function showLoginForm() {
     signupForm.classList.add('hidden');
     loginForm.classList.remove('hidden');
-    authTitle.textContent = "Terminal Authorization";
-    authSubtitle.textContent = "Enter your operator credentials to authorize SCADA core terminal access";
+    authTitle.textContent = "Operator Authorization";
+    authSubtitle.textContent = "Authenticate operator passkey credentials to access SCADA core terminal";
   }
 
   function showSignupForm() {
     loginForm.classList.add('hidden');
     signupForm.classList.remove('hidden');
     authTitle.textContent = "Operator Registration";
-    authSubtitle.textContent = "Initialize a local secure operator account to manage the SCADA node";
+    authSubtitle.textContent = "Register local operator passkey files to initialize the SCADA telemetry grid node";
   }
 
   toLogin.addEventListener('click', (e) => {
@@ -125,15 +156,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirm = document.getElementById('signup-confirm').value;
     
     if (!name) {
-      signupError.textContent = "Please enter operator name.";
+      signupError.textContent = "Operator Username cannot be blank.";
       return;
     }
     if (password.length < 4) {
-      signupError.textContent = "Password must be at least 4 characters.";
+      signupError.textContent = "Passkey must be at least 4 characters.";
       return;
     }
     if (password !== confirm) {
-      signupError.textContent = "Passwords do not match.";
+      signupError.textContent = "Passkey credentials do not match.";
       return;
     }
     
@@ -156,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const operator = getOperator();
     if (!operator || operator.name !== name || operator.password !== password) {
       loginError.textContent = "Invalid operator credentials.";
+      writeLog(`Unauthorized access attempt denied for operator ID "${name.toUpperCase()}".`, 'error');
       return;
     }
     
@@ -165,6 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle Logout
   btnLogout.addEventListener('click', () => {
+    const operator = getOperator();
+    writeLog(`Operator ${operator ? operator.name.toUpperCase() : 'USER'} securely logged out. Session locked.`, 'warning');
     localStorage.removeItem('operatorSession');
     checkSession();
   });
@@ -173,21 +207,25 @@ document.addEventListener('DOMContentLoaded', () => {
   async function initONNX() {
     try {
       btnPredict.disabled = true;
-      btnPredict.textContent = 'CONNECTING TO AUTOENCODER MODEL...';
+      btnPredict.textContent = 'CONNECTING TO AUTOENCODER NEURAL MODEL...';
+      writeLog("Connecting to neural networks core...", 'info');
 
       // 1. Fetch scaler parameters from public scaler.json
       const scalerRes = await fetch('./scaler.json');
       scaler = await scalerRes.json();
+      writeLog("Standard Scaler coefficients loaded successfully [scaler.json].", 'success');
 
       // 2. Initialize ONNX runtime session from public model
       session = await ort.InferenceSession.create('./gru_ae_best.onnx');
+      writeLog("ONNX Runtime engine online. GRU Autoencoder loaded successfully [gru_ae_best.onnx].", 'success');
 
       btnPredict.disabled = false;
-      btnPredict.textContent = 'Run GRU Autoencoder Analysis';
-      console.log('ONNX Model & SCADA Scaler connected successfully.');
+      btnPredict.textContent = '⚡ Run GRU Neural Network pass';
+      writeLog("Core SCADA Telemetry terminal ready for input.", 'success');
     } catch (err) {
       console.error('Failed to load ONNX or Scaler:', err);
       inputFeedback.textContent = 'Failed to load model: ' + err.message + '. Please check that gru_ae_best.onnx is compiled in the public directory.';
+      writeLog("Core ML system load failure: " + err.message, 'error');
     }
   }
 
@@ -195,12 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
   btnLoadNormal.addEventListener('click', () => {
     featuresInput.value = normalSample.join(", ");
     inputFeedback.textContent = '';
+    writeLog("Nominal SCADA Telemetry dataset snapshot loaded into RX Terminal.", 'info');
     resetUI();
   });
 
   btnLoadLeak.addEventListener('click', () => {
     featuresInput.value = leakSample.join(", ");
     inputFeedback.textContent = '';
+    writeLog("Anomaly SCADA Telemetry dataset snapshot loaded into RX Terminal.", 'warning');
     resetUI();
   });
 
@@ -217,10 +257,14 @@ document.addEventListener('DOMContentLoaded', () => {
     particlesContainer.setAttribute('opacity', '1');
     leakageSpray.classList.add('hidden');
     
+    gaugeBar.style.width = "0%";
+    gaugeBar.className = "gauge-bar-inner";
+    gaugeRatio.textContent = "0.0%";
+    
     visStatusOverlay.className = "pipeline-alert-overlay";
     visStatusOverlay.innerHTML = `
-      <span class="visualizer-status-badge status-normal">STANDBY</span>
-      <p class="visualizer-status-description" id="visualizer-desc">Inference terminal initialized. Operator ready to run telemetry checks.</p>
+      <span class="visualizer-status-badge status-normal">SYSTEM INITIALIZED</span>
+      <p class="visualizer-status-description">Inference gateway ready. Awaiting telemetry snapshot pass...</p>
     `;
   }
 
@@ -243,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const parts = rawVal.split(',').map(s => s.trim()).filter(s => s !== '');
     if (parts.length !== 40) {
       inputFeedback.textContent = `Error: Expected exactly 40 SCADA channels. You provided ${parts.length}.`;
+      writeLog(`Telemetry packet rejection: Expected 40 telemetry channels, got ${parts.length}.`, 'error');
       return;
     }
 
@@ -251,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const num = Number(p);
       if (isNaN(num)) {
         inputFeedback.textContent = `Error: Value "${p}" is not a valid SCADA reading.`;
+        writeLog(`Telemetry packet rejection: Invalid float literal "${p}".`, 'error');
         return;
       }
       features.push(num);
@@ -259,10 +305,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       btnPredict.disabled = true;
       btnPredict.classList.add('scanning');
-      btnPredict.textContent = 'SCANNING TELEMETRY TELEMETRY...';
+      btnPredict.textContent = 'RUNNING GRU AUTOENCODER EVALUATION...';
+      writeLog("Running feedforward pass through the GRU Autoencoder network...", 'info');
 
-      // Simulate a high-tech delay for scanning effect (600ms)
-      await new Promise(r => setTimeout(r, 600));
+      // Simulate a high-tech scan delay for scanline effects (700ms)
+      await new Promise(r => setTimeout(r, 700));
 
       // 1. Telemetry Scaling: (x - mean) / scale
       const mean = scaler.mean;
@@ -293,59 +340,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 6. Update Dashboard Widgets
       if (isLeak) {
-        valStatus.textContent = "LEAK DETECTED";
+        valStatus.textContent = "LEAK ALARM";
         valStatus.className = "stat-value text-danger";
-        cardStatus.style.borderColor = "rgba(239, 68, 68, 0.4)";
+        cardStatus.style.borderColor = "rgba(255, 0, 85, 0.4)";
+        writeLog(`CRITICAL ANOMALY ALERT! Telemetry MSE ${mse.toFixed(6)} exceeds threshold ${threshold.toFixed(6)} [Segment V1-V2].`, 'error');
       } else {
-        valStatus.textContent = "NOMINAL";
+        valStatus.textContent = "SECURE";
         valStatus.className = "stat-value text-success";
-        cardStatus.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        cardStatus.style.borderColor = "rgba(57, 255, 20, 0.4)";
+        writeLog(`Telemetry health nominal. MSE ${mse.toFixed(6)} well within operating limits (Limit: ${threshold.toFixed(6)}).`, 'success');
       }
 
       valMse.textContent = mse.toFixed(6);
       valLimit.textContent = threshold.toFixed(6);
 
       if (isNighttime) {
-        valTime.textContent = "NIGHT TIME OPERATIONS";
+        valTime.textContent = "NIGHT CONTEXT";
         iconTime.textContent = "🌙";
-        cardTime.style.borderColor = "rgba(168, 85, 247, 0.3)";
+        cardTime.style.borderColor = "rgba(147, 51, 234, 0.4)";
+        writeLog("Operations switched to LUNAR SOLAR nighttime telemetry constraints.", 'info');
       } else {
-        valTime.textContent = "DAY TIME OPERATIONS";
+        valTime.textContent = "DAY CONTEXT";
         iconTime.textContent = "☀️";
-        cardTime.style.borderColor = "rgba(14, 165, 233, 0.3)";
+        cardTime.style.borderColor = "rgba(6, 182, 212, 0.4)";
+        writeLog("Operations switched to SOLAR daytime telemetry constraints.", 'info');
+      }
+
+      // Update Telemetry Progress Gauge Ratio
+      const ratio = Math.min((mse / threshold) * 100, 100);
+      gaugeRatio.textContent = ratio.toFixed(1) + "%";
+      gaugeBar.style.width = ratio + "%";
+      
+      if (isLeak) {
+        gaugeBar.className = "gauge-bar-inner gauge-bar-leak";
+      } else {
+        gaugeBar.className = "gauge-bar-inner";
       }
 
       // 7. Render Pipeline Animative Flow States
       if (isLeak) {
-        // Red flashing pipeline
         activePipe.classList.add('pipe-alert-leak');
-        particlesContainer.setAttribute('opacity', '0.25');
-        // Show Dripping leakage droplets & rings
+        particlesContainer.setAttribute('opacity', '0.2');
         leakageSpray.classList.remove('hidden');
         
         visStatusOverlay.innerHTML = `
           <span class="visualizer-status-badge status-leak">🚨 CRITICAL</span>
-          <p class="visualizer-status-description" id="visualizer-desc">GRU Autoencoder detected leakage. Anomaly Reconstruction Loss: ${mse.toFixed(6)} (Limit: ${threshold.toFixed(6)}).</p>
+          <p class="visualizer-status-description">Leak detected in pipeline segment. Anomaly ratio at ${ratio.toFixed(1)}% of threshold capacity.</p>
         `;
       } else {
-        // Healthy flowing blue pipeline
         activePipe.classList.remove('pipe-alert-leak');
         particlesContainer.setAttribute('opacity', '1');
         leakageSpray.classList.add('hidden');
         
         visStatusOverlay.innerHTML = `
           <span class="visualizer-status-badge status-normal">🟢 HEALTHY</span>
-          <p class="visualizer-status-description" id="visualizer-desc">Pipeline health nominal. Telemetry loss well within permitted operating limits.</p>
+          <p class="visualizer-status-description">Flow nominal. Pipeline integrity verified at ${ratio.toFixed(1)}% telemetry loss threshold.</p>
         `;
       }
 
     } catch (err) {
       console.error(err);
       inputFeedback.textContent = 'Analysis evaluation failed: ' + err.message;
+      writeLog("Telemetry scan failure: " + err.message, 'error');
     } finally {
       btnPredict.disabled = false;
       btnPredict.classList.remove('scanning');
-      btnPredict.textContent = 'Run GRU Autoencoder Analysis';
+      btnPredict.textContent = '⚡ Run GRU Neural Network pass';
     }
   });
 

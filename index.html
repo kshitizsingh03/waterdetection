@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SCADA Control Room - Leak Detection</title>
+  <title>SCADA Core HUD - Industrial Leak Detection</title>
   <link rel="stylesheet" href="styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <!-- ONNX Runtime Web -->
@@ -11,71 +11,75 @@
 </head>
 <body>
 
-  <!-- Glowing Mesh Background -->
+  <!-- Futuristic Cyber Grid Background -->
   <div class="mesh-bg"></div>
+  <div class="scanlines"></div>
 
-  <!-- 1. AUTHENTICATION PORTAL (Glassmorphic Card) -->
+  <!-- 🖥️ OPERATOR AUTH PORTAL -->
   <div id="auth-portal" class="auth-container">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="logo-glow">⚡</div>
-        <h2 id="auth-title">System Registration</h2>
-        <p id="auth-subtitle">Create a secure local operator account to access the SCADA terminal</p>
+        <div class="logo-glow">🎛️</div>
+        <h2>SCADA Operator Gateway</h2>
+        <p>Authorize operator credentials to access core pipeline telemetry</p>
       </div>
 
-      <!-- Signup Form -->
+      <!-- Operator Signup Form -->
       <form id="signup-form">
         <div class="input-group">
           <input type="text" id="signup-name" required placeholder=" " />
-          <label for="signup-name">Operator Name</label>
+          <label>👤 Operator Username</label>
         </div>
         <div class="input-group">
           <input type="password" id="signup-password" required placeholder=" " />
-          <label for="signup-password">Master Password</label>
+          <label>🔑 Operator Passkey</label>
         </div>
         <div class="input-group">
           <input type="password" id="signup-confirm" required placeholder=" " />
-          <label for="signup-confirm">Confirm Password</label>
+          <label>🔄 Re-enter Passkey</label>
         </div>
         <span id="signup-error" class="error-msg"></span>
-        <button type="submit" class="btn btn-glow btn-primary">Initialize Access</button>
-        <p class="auth-toggle">Already an operator? <a href="#" id="to-login">Log In</a></p>
+        <button type="submit" class="btn btn-glow btn-primary">Initialize Access Protocol</button>
+        <p class="auth-toggle">Already certified? <a href="#" id="to-login">Access Portal Log In</a></p>
       </form>
 
-      <!-- Login Form (Hidden by default) -->
+      <!-- Operator Login Form -->
       <form id="login-form" class="hidden">
         <div class="input-group">
           <input type="text" id="login-name" required placeholder=" " />
-          <label for="login-name">Operator Name</label>
+          <label>👤 Operator Username</label>
         </div>
         <div class="input-group">
           <input type="password" id="login-password" required placeholder=" " />
-          <label for="login-password">Master Password</label>
+          <label>🔑 Operator Passkey</label>
         </div>
         <span id="login-error" class="error-msg"></span>
-        <button type="submit" class="btn btn-glow btn-primary">Authenticate Operator</button>
-        <p class="auth-toggle">New personnel? <a href="#" id="to-signup">Register here</a></p>
+        <button type="submit" class="btn btn-glow btn-primary">Authenticate Identity</button>
+        <p class="auth-toggle">New operator? <a href="#" id="to-signup">Request access here</a></p>
       </form>
     </div>
   </div>
 
-  <!-- 2. SCADA CONTROL DASHBOARD (Hidden by default) -->
+  <!-- 📟 INDUSTRIAL SCADA DASHBOARD HUD -->
   <div id="scada-dashboard" class="dashboard-container hidden">
     <!-- Top Control Bar -->
     <header class="dashboard-header">
       <div class="header-brand">
         <span class="pulse-indicator online"></span>
         <div class="brand-text">
-          <h1>SCADA CORE TERMINAL</h1>
-          <p>Real-Time Leakage & Anomaly Detection System</p>
+          <h1>⚡ WATERGRID-SCADA CORE HUD ⚡</h1>
+          <p>Autonomous Autoencoder Pipeline Surveillance System</p>
         </div>
       </div>
       <div class="header-actions">
         <div class="operator-profile">
           <div class="avatar">OP</div>
-          <span id="operator-display-name">Operator</span>
+          <div>
+            <span id="operator-display-name">OPERATOR</span>
+            <small class="badge-role">CERTIFIED CHIEF OPERATOR</small>
+          </div>
         </div>
-        <button id="btn-logout" class="btn btn-logout">Secure Terminal Log Out</button>
+        <button id="btn-logout" class="btn btn-logout">🔒 Lock Terminal</button>
       </div>
     </header>
 
@@ -84,16 +88,16 @@
       <section class="stats-grid">
         <!-- Status Card -->
         <div class="stat-card" id="card-status">
-          <div class="stat-icon">🏥</div>
+          <div class="stat-icon">⚙️</div>
           <div class="stat-content">
-            <h3>System Status</h3>
-            <div class="stat-value text-success" id="val-status">NOMINAL</div>
+            <h3>Pipeline Health</h3>
+            <div class="stat-value text-success" id="val-status">SECURE</div>
           </div>
         </div>
 
         <!-- MSE Loss Card -->
         <div class="stat-card">
-          <div class="stat-icon">📊</div>
+          <div class="stat-icon">📈</div>
           <div class="stat-content">
             <h3>Reconstruction Loss (MSE)</h3>
             <div class="stat-value text-cyan" id="val-mse">0.000000</div>
@@ -102,9 +106,9 @@
 
         <!-- Limit Card -->
         <div class="stat-card">
-          <div class="stat-icon">🛡️</div>
+          <div class="stat-icon">🚧</div>
           <div class="stat-content">
-            <h3>Allowed Anomaly Limit</h3>
+            <h3>Dynamic Anomaly Limit</h3>
             <div class="stat-value" id="val-limit">0.004800</div>
           </div>
         </div>
@@ -113,8 +117,8 @@
         <div class="stat-card" id="card-time">
           <div class="stat-icon" id="icon-time">☀️</div>
           <div class="stat-content">
-            <h3>Pipeline Operations Context</h3>
-            <div class="stat-value text-cyan" id="val-time">DAYTIME MODE</div>
+            <h3>Solar Environment Context</h3>
+            <div class="stat-value text-cyan" id="val-time">DAYTIME SOLAR MODE</div>
           </div>
         </div>
       </section>
@@ -124,8 +128,8 @@
         <!-- Left Side: Terminal Code Input -->
         <section class="op-panel input-panel">
           <div class="panel-header">
-            <h2>SCADA Snapshot Input Terminal</h2>
-            <span class="panel-subtitle">Upload or paste 40-feature comma-separated telemetry readings</span>
+            <h2>💻 Telemetry RX Input Terminal</h2>
+            <span class="panel-subtitle">Parse raw SCADA sensor snapshot (40 channel comma-separated float array)</span>
           </div>
           
           <div class="panel-body">
@@ -137,33 +141,44 @@
                 <span>04</span>
                 <span>05</span>
               </div>
-              <textarea id="features-input" placeholder="Paste SCADA comma-separated telemetry readings here... (e.g. 28.20, 33.25, 36.63, ...)"></textarea>
+              <textarea id="features-input" placeholder="Paste 40 comma-separated telemetry readings here... (e.g. 28.2048, 33.2571, 36.6379, ...)"></textarea>
             </div>
             <span id="input-feedback" class="feedback-msg"></span>
 
             <div class="telemetry-actions">
-              <button type="button" id="btn-load-normal" class="btn btn-secondary">⚡ Load Nominal SCADA Data</button>
-              <button type="button" id="btn-load-leak" class="btn btn-danger-glow">🚨 Load Anomaly SCADA Data</button>
+              <button type="button" id="btn-load-normal" class="btn btn-secondary">🟢 Load Nominal Telemetry</button>
+              <button type="button" id="btn-load-leak" class="btn btn-danger-glow">🔴 Load Anomaly Telemetry</button>
             </div>
 
             <button type="button" id="btn-predict" class="btn btn-glow btn-primary btn-run-ml">
               <span class="scanner-line"></span>
-              Run GRU Autoencoder Analysis
+              ⚡ Run GRU Neural Network pass
             </button>
           </div>
         </section>
 
-        <!-- Right Side: Animated Schematic -->
+        <!-- Right Side: Animated Schematic & Gauge -->
         <section class="op-panel visualizer-panel">
           <div class="panel-header">
-            <h2>Real-Time Pipeline Flow Schematic</h2>
-            <span class="panel-subtitle">Visualizing autoencoder anomaly detection across the distribution pipeline</span>
+            <h2>🚰 Distribution Pipeline flow visualizer</h2>
+            <span class="panel-subtitle">Real-time reconstruction error mapping along the V1-V2 pipeline segment</span>
           </div>
 
           <div class="panel-body visualizer-body">
+            <!-- Dynamic Loss Gauge -->
+            <div class="gauge-container">
+              <div class="gauge-header">
+                <span>RECONSTRUCTION ERROR RATIO</span>
+                <span id="gauge-ratio">0.0%</span>
+              </div>
+              <div class="gauge-bar-outer">
+                <div class="gauge-bar-inner" id="gauge-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
             <!-- Animated Pipeline SVG -->
             <div class="pipeline-schematic-container">
-              <svg class="pipeline-svg" viewBox="0 0 400 300">
+              <svg class="pipeline-svg" viewBox="0 0 400 240">
                 <!-- Glowing shadows -->
                 <defs>
                   <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
@@ -177,58 +192,75 @@
                 </defs>
 
                 <!-- Pipeline Grid Backdrop -->
-                <g stroke="#1e293b" stroke-width="0.5" stroke-dasharray="3,3">
-                  <line x1="20" y1="50" x2="380" y2="50" />
-                  <line x1="20" y1="150" x2="380" y2="150" />
-                  <line x1="20" y1="250" x2="380" y2="250" />
-                  <line x1="80" y1="20" x2="80" y2="280" />
-                  <line x1="200" y1="20" x2="200" y2="280" />
-                  <line x1="320" y1="20" x2="320" y2="280" />
+                <g stroke="#0f172a" stroke-width="0.75" stroke-dasharray="4,4">
+                  <line x1="20" y1="40" x2="380" y2="40" />
+                  <line x1="20" y1="120" x2="380" y2="120" />
+                  <line x1="20" y1="200" x2="380" y2="200" />
+                  <line x1="80" y1="20" x2="80" y2="220" />
+                  <line x1="200" y1="20" x2="200" y2="220" />
+                  <line x1="320" y1="20" x2="320" y2="220" />
                 </g>
 
-                <!-- Pressure Sensors Indicators -->
-                <circle cx="80" cy="150" r="15" fill="#0f172a" stroke="#334155" stroke-width="2" />
-                <text x="80" y="154" font-size="10" fill="#64748b" text-anchor="middle" font-family="monospace">P1</text>
+                <!-- Distribution Valve V1 -->
+                <circle cx="80" cy="120" r="16" fill="#0b1329" stroke="#334155" stroke-width="2" />
+                <text x="80" y="124" font-size="10" fill="#38bdf8" text-anchor="middle" font-family="monospace" font-weight="bold">V1</text>
+                <text x="80" y="98" font-size="9" fill="#64748b" text-anchor="middle" font-family="sans-serif">PRESSURE</text>
 
-                <circle cx="320" cy="150" r="15" fill="#0f172a" stroke="#334155" stroke-width="2" />
-                <text x="320" y="154" font-size="10" fill="#64748b" text-anchor="middle" font-family="monospace">P2</text>
+                <!-- Distribution Valve V2 -->
+                <circle cx="320" cy="120" r="16" fill="#0b1329" stroke="#334155" stroke-width="2" />
+                <text x="320" y="124" font-size="10" fill="#38bdf8" text-anchor="middle" font-family="monospace" font-weight="bold">V2</text>
+                <text x="320" y="98" font-size="9" fill="#64748b" text-anchor="middle" font-family="sans-serif">DEMAND</text>
+
+                <!-- Reservoir Indicator -->
+                <circle cx="20" cy="120" r="8" fill="#0369a1" />
 
                 <!-- The Pipeline Tube -->
-                <path id="main-pipe" d="M 20 150 L 380 150" stroke="#0284c7" stroke-width="24" stroke-linecap="round" fill="none" opacity="0.15" />
-                <path id="active-pipe" d="M 20 150 L 380 150" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" fill="none" class="pipe-flow-glow" />
+                <path id="main-pipe" d="M 20 120 L 380 120" stroke="#0369a1" stroke-width="20" stroke-linecap="round" fill="none" opacity="0.2" />
+                <path id="active-pipe" d="M 20 120 L 380 120" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" fill="none" class="pipe-flow-glow" />
 
                 <!-- Water Particles (Flowing dots) -->
                 <g class="water-particles" id="particles-container">
-                  <circle cx="40" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 0s" />
-                  <circle cx="100" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 0.8s" />
-                  <circle cx="160" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 1.6s" />
-                  <circle cx="220" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 2.4s" />
-                  <circle cx="280" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 3.2s" />
-                  <circle cx="340" cy="150" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 4.0s" />
+                  <circle cx="40" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 0s" />
+                  <circle cx="100" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 0.8s" />
+                  <circle cx="160" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 1.6s" />
+                  <circle cx="220" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 2.4s" />
+                  <circle cx="280" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 3.2s" />
+                  <circle cx="340" cy="120" r="3" fill="#e0f2fe" class="p-dot" style="animation-delay: 4.0s" />
                 </g>
 
-                <!-- Leakage Spray (Animated dripping droplets, hidden by default) -->
+                <!-- Leakage Spray -->
                 <g id="leakage-spray" class="hidden">
-                  <!-- Leak Location Spot -->
-                  <circle cx="200" cy="150" r="6" fill="#ef4444" />
+                  <!-- Leak Spot -->
+                  <circle cx="200" cy="120" r="7" fill="#ef4444" />
                   <!-- Dripping drops -->
-                  <circle cx="200" cy="155" r="2.5" fill="#fca5a5" class="drip-drop" style="animation-delay: 0s;" />
-                  <circle cx="200" cy="155" r="2" fill="#ef4444" class="drip-drop" style="animation-delay: 0.5s;" />
-                  <circle cx="200" cy="155" r="1.5" fill="#ef4444" class="drip-drop" style="animation-delay: 1.0s;" />
+                  <circle cx="200" cy="125" r="3" fill="#fca5a5" class="drip-drop" style="animation-delay: 0s;" />
+                  <circle cx="200" cy="125" r="2" fill="#ef4444" class="drip-drop" style="animation-delay: 0.5s;" />
                   <!-- Alert Wave -->
-                  <circle cx="200" cy="150" r="12" fill="none" stroke="#ef4444" stroke-width="1.5" class="leak-pulse-wave" />
+                  <circle cx="200" cy="120" r="14" fill="none" stroke="#ef4444" stroke-width="2" class="leak-pulse-wave" />
                 </g>
               </svg>
             </div>
 
             <!-- Pipeline Overlay Alert Text -->
             <div class="pipeline-alert-overlay" id="visualizer-status-overlay">
-              <span class="visualizer-status-badge status-normal">STANDBY</span>
-              <p class="visualizer-status-description" id="visualizer-desc">Telemetry data not loaded.</p>
+              <span class="visualizer-status-badge status-normal">SYSTEM INITIALIZED</span>
+              <p class="visualizer-status-description" id="visualizer-desc">Awaiting SCADA telemetry packet to initiate neural network scan...</p>
             </div>
           </div>
         </section>
       </div>
+
+      <!-- 📟 LIVE SYSTEM EVENT LOG CONSOLE -->
+      <section class="op-panel console-panel">
+        <div class="panel-header console-header">
+          <h2>📟 Core System Events Log</h2>
+          <span class="console-clear-btn" id="btn-clear-console">Clear Log</span>
+        </div>
+        <div class="console-body" id="console-logs">
+          <div class="console-line"><span class="log-time">[09:00:00]</span> <span class="log-info">[INFO]</span> SCADA Core Terminal interface booted.</div>
+          <div class="console-line"><span class="log-time">[09:00:01]</span> <span class="log-info">[INFO]</span> Awaiting certified operator passkey authorization...</div>
+        </div>
+      </section>
     </main>
   </div>
 
