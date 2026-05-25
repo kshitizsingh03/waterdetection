@@ -6,6 +6,8 @@
   <title>Water Leakage Detection Inference</title>
   <link rel="stylesheet" href="styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- ONNX Runtime Web CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 </head>
 <body>
 
@@ -28,12 +30,15 @@
         
         <form id="inference-form">
           <div class="form-group">
-            <textarea id="features-input" rows="6" placeholder="e.g., 0.12, 1.45, 2.3, ... (40 values)"></textarea>
+            <textarea id="features-input" rows="6" placeholder="e.g., 28.20, 33.25, 36.63, ... (40 values)"></textarea>
             <span id="input-feedback" class="feedback-msg"></span>
           </div>
           
-          <button type="submit" id="btn-predict" class="btn btn-primary">Detect Leakage</button>
-          <button type="button" id="btn-load-sample" class="btn btn-secondary">Load Sample Leak Data</button>
+          <div class="form-actions">
+            <button type="submit" id="btn-predict" class="btn btn-primary">Detect Leakage</button>
+            <button type="button" id="btn-load-normal" class="btn btn-secondary">Load Normal Sample</button>
+            <button type="button" id="btn-load-leak" class="btn btn-danger">Load Leak Sample</button>
+          </div>
         </form>
       </section>
 
